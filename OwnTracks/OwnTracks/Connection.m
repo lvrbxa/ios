@@ -66,6 +66,8 @@
 
 #define RECONNECT_TIMER 1.0
 #define RECONNECT_TIMER_MAX 64.0
+#define BATCH_SECONDS 600.0 // 改造5: まとめて送る間隔
+#define BATCH_MAX 40 // 改造5: 1回に送る最大件数（Workerの上限16KBに収める）
 
 @implementation Connection
 
@@ -111,9 +113,22 @@
                     [self.delegate totalBuffered: self count:matches.count];
                     if (matches.count) {
                         Queue *queue = matches.firstObject;
-                        
-                        if (self.state == state_starting) {
-                            [self sendHTTP:queue.topic data:queue.data];
+                        // 改造5: 最も古い待ちがBATCH_SECONDSを超えたか、BATCH_MAX件たまったら、配列でまとめて送る
+                        BOOL due = matches.count >= BATCH_MAX ||
+                            -[queue.timestamp timeIntervalSinceNow] >= BATCH_SECONDS;
+
+                        if (self.state == state_starting && due) {
+                            NSUInteger n = MIN(matches.count, (NSUInteger)BATCH_MAX);
+                            NSMutableData *body = [NSMutableData dataWithBytes:"[" length:1];
+                            for (NSUInteger i = 0; i < n; i++) {
+                                Queue *q = matches[i];
+                                if (i > 0) [body appendBytes:"," length:1];
+                                if (q.data) [body appendData:q.data]; else [body appendBytes:"{}" length:2];
+                            }
+                            [body appendBytes:"]" length:1];
+                            OwnTracksLogDefault("[Connection] batch send %lu of %lu",
+                                                (unsigned long)n, (unsigned long)matches.count);
+                            [self sendHTTP:queue.topic data:body count:n];
                             runUntilDate = 0.1;
                         }
 
@@ -259,7 +274,21 @@ willPerformHTTPRedirection:(NSHTTPURLResponse *)redirectResponse
     [NavigationController alertWithTitle:@"HTTP" message:message];
 }
 
-- (void)sendHTTP:(NSString *)topic data:(NSData *)data {
+// 送れたら（4xxで捨てるときも）、待ち行列の先頭からcount件を消す
+- (void)deleteFirst:(NSUInteger)count {
+    NSFetchRequest *request = [NSFetchRequest fetchRequestWithEntityName:@"Queue"];
+    request.sortDescriptors = @[[NSSortDescriptor sortDescriptorWithKey:@"timestamp" ascending:YES]];
+    request.fetchLimit = count;
+    NSArray *matches = [CoreData.sharedInstance.queuedMOC executeFetchRequest:request error:nil];
+    for (NSManagedObject *object in matches) {
+        [CoreData.sharedInstance.queuedMOC deleteObject:object];
+    }
+    if (matches.count) {
+        [CoreData.sharedInstance sync:CoreData.sharedInstance.queuedMOC];
+    }
+}
+
+- (void)sendHTTP:(NSString *)topic data:(NSData *)data count:(NSUInteger)count {
     NSString *postLength = [NSString stringWithFormat:@"%ld",(unsigned long)data.length];
     OwnTracksLogDebug("[Connection] sendtHTTP %@(%@):%@",
                  topic, postLength, [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding]);
@@ -341,13 +370,9 @@ willPerformHTTPRedirection:(NSHTTPURLResponse *)redirectResponse
                          NSArray *matches = [CoreData.sharedInstance.queuedMOC executeFetchRequest:request error:nil];
                          if (matches) {
                              [self.delegate totalBuffered: self count:matches.count];
-                             if (matches.count) {
-                                 Queue *queue = matches.firstObject;
-                                 [CoreData.sharedInstance.queuedMOC deleteObject:queue];
-                                 [CoreData.sharedInstance sync:CoreData.sharedInstance.queuedMOC];
-                             }
                          }
-                         
+                         [self deleteFirst:count];
+
                          NSData *incomingData = data;
                          OwnTracksLogDebug("[Connection] HTTP %ld incomingData(%lu): %@",
                                            (long)httpResponse.statusCode,
@@ -399,12 +424,8 @@ willPerformHTTPRedirection:(NSHTTPURLResponse *)redirectResponse
                              NSArray *matches = [CoreData.sharedInstance.queuedMOC executeFetchRequest:request error:nil];
                              if (matches) {
                                  [self.delegate totalBuffered: self count:matches.count];
-                                 if (matches.count) {
-                                     Queue *queue = matches.firstObject;
-                                     [CoreData.sharedInstance.queuedMOC deleteObject:queue];
-                                     [CoreData.sharedInstance sync:CoreData.sharedInstance.queuedMOC];
-                                 }
                              }
+                             [self deleteFirst:count];
 
                              return;
                          }];
