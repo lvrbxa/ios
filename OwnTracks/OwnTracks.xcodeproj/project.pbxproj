@@ -72,7 +72,6 @@
 		84929F0B20AAC0D000227D00 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 84929F0A20AAC0CF00227D00 /* WebKit.framework */; };
 		849551F52EF41EAE00675342 /* CreateTourTVC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 849551F42EF41EAE00675342 /* CreateTourTVC.swift */; };
 		849551F72EF42D4300675342 /* ToursStatusCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 849551F62EF42D4300675342 /* ToursStatusCell.swift */; };
-		84A4002B2F8ABBFA00340475 /* MQTTClient in Frameworks */ = {isa = PBXBuildFile; productRef = 84A4002A2F8ABBFA00340475 /* MQTTClient */; };
 		84A452BA2F35157000AA6A29 /* StatusTVC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84A452B92F35156F00AA6A29 /* StatusTVC.swift */; };
 		84AFD40B2434486200F1E922 /* OwnTracking.m in Sources */ = {isa = PBXBuildFile; fileRef = 84AFD40A2434486200F1E922 /* OwnTracking.m */; };
 		84B0CDAD239E2EFA00CE9305 /* BackgroundTasks.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 84B0CDAC239E2EFA00CE9305 /* BackgroundTasks.framework */; };
@@ -99,9 +98,6 @@
 		84E8A1891BB94782002518AA /* Setting+CoreDataProperties.m in Sources */ = {isa = PBXBuildFile; fileRef = 84E8A17F1BB94782002518AA /* Setting+CoreDataProperties.m */; };
 		84E8A18A1BB94782002518AA /* Friend+CoreDataProperties.m in Sources */ = {isa = PBXBuildFile; fileRef = 84E8A1811BB94782002518AA /* Friend+CoreDataProperties.m */; };
 		84E8A18D1BB94782002518AA /* Region+CoreDataProperties.m in Sources */ = {isa = PBXBuildFile; fileRef = 84E8A1871BB94782002518AA /* Region+CoreDataProperties.m */; };
-		84ED67862F1E95110013A265 /* Clibsodium in Frameworks */ = {isa = PBXBuildFile; productRef = 84ED67852F1E95110013A265 /* Clibsodium */; };
-		84ED67882F1E95110013A265 /* Sodium in Frameworks */ = {isa = PBXBuildFile; productRef = 84ED67872F1E95110013A265 /* Sodium */; };
-		84ED67922F1E9A0E0013A265 /* DSJSONSchemaValidation in Frameworks */ = {isa = PBXBuildFile; productRef = 84ED67912F1E9A0E0013A265 /* DSJSONSchemaValidation */; };
 		84FAEA7225F01DA100DCD479 /* Launch Screen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 84FAEA7125F01DA100DCD479 /* Launch Screen.storyboard */; };
 /* End PBXBuildFile section */
 
@@ -404,11 +400,7 @@
 				84C3F45C2CEF904F004DB332 /* AssetsLibrary.framework in Frameworks */,
 				8411B832189FDB140019D2D6 /* CoreData.framework in Frameworks */,
 				8411B830189FDB140019D2D6 /* UIKit.framework in Frameworks */,
-				84ED67882F1E95110013A265 /* Sodium in Frameworks */,
 				8411B82C189FDB140019D2D6 /* Foundation.framework in Frameworks */,
-				84ED67922F1E9A0E0013A265 /* DSJSONSchemaValidation in Frameworks */,
-				84ED67862F1E95110013A265 /* Clibsodium in Frameworks */,
-				84A4002B2F8ABBFA00340475 /* MQTTClient in Frameworks */,
 				84C3F45E2CF09F9B004DB332 /* PhotosUI.framework in Frameworks */,
 			);
 		};
@@ -816,9 +808,6 @@
 			);
 			mainGroup = 8411B81F189FDB140019D2D6;
 			packageReferences = (
-				84ED67842F1E95110013A265 /* XCRemoteSwiftPackageReference "swift-sodium" */,
-				84ED67902F1E9A0E0013A265 /* XCRemoteSwiftPackageReference "JSONSchemaValidation" */,
-				84C2E5E22F8ABA0400D5FFD5 /* XCRemoteSwiftPackageReference "MQTTClient" */,
 			);
 			preferredProjectObjectVersion = 110;
 			productRefGroup = 8411B829189FDB140019D2D6 /* Products */;
@@ -1595,53 +1584,9 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		84C2E5E22F8ABA0400D5FFD5 /* XCRemoteSwiftPackageReference "MQTTClient" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "git@github.com:ckrey/MQTTClient.git";
-			requirement = {
-				branch = main;
-				kind = branch;
-			};
-		};
-		84ED67842F1E95110013A265 /* XCRemoteSwiftPackageReference "swift-sodium" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/jedisct1/swift-sodium.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.10.0;
-			};
-		};
-		84ED67902F1E9A0E0013A265 /* XCRemoteSwiftPackageReference "JSONSchemaValidation" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/dashpay/JSONSchemaValidation.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 2.0.7;
-			};
-		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		84A4002A2F8ABBFA00340475 /* MQTTClient */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 84C2E5E22F8ABA0400D5FFD5 /* XCRemoteSwiftPackageReference "MQTTClient" */;
-			productName = MQTTClient;
-		};
-		84ED67852F1E95110013A265 /* Clibsodium */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 84ED67842F1E95110013A265 /* XCRemoteSwiftPackageReference "swift-sodium" */;
-			productName = Clibsodium;
-		};
-		84ED67872F1E95110013A265 /* Sodium */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 84ED67842F1E95110013A265 /* XCRemoteSwiftPackageReference "swift-sodium" */;
-			productName = Sodium;
-		};
-		84ED67912F1E9A0E0013A265 /* DSJSONSchemaValidation */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 84ED67902F1E9A0E0013A265 /* XCRemoteSwiftPackageReference "JSONSchemaValidation" */;
-			productName = DSJSONSchemaValidation;
-		};
 /* End XCSwiftPackageProductDependency section */
 
 /* Begin XCVersionGroup section */

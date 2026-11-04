@@ -7,7 +7,20 @@
 //
 
 #import <Foundation/Foundation.h>
-#import "MQTTSession.h"
+
+// 改造版: MQTTClientを外した。呼び出し側が使う型だけ同じ値で残す（MQTTMessage.hと同じ定義）
+typedef NS_ENUM(UInt8, MQTTQosLevel) {
+    MQTTQosLevelAtMostOnce = 0,
+    MQTTQosLevelAtLeastOnce = 1,
+    MQTTQosLevelExactlyOnce = 2
+};
+
+typedef NS_ENUM(UInt8, MQTTProtocolVersion) {
+    MQTTProtocolVersion0 = 0,
+    MQTTProtocolVersion31 = 3,
+    MQTTProtocolVersion311 = 4,
+    MQTTProtocolVersion50 = 5
+};
 
 @class Connection;
 
@@ -32,7 +45,7 @@ enum state {
 
 @end
 
-@interface Connection: NSThread <MQTTSessionDelegate>
+@interface Connection: NSThread
 
 @property (weak, nonatomic) _Nullable id<ConnectionDelegate> delegate;
 @property (nonatomic) BOOL terminate;

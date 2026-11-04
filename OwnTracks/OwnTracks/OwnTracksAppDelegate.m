@@ -1833,8 +1833,8 @@ performActionForShortcutItem:(UIApplicationShortcutItem *)shortcutItem completio
             OwnTracksLogDebug("[OwnTracksAppDelegate] getting p12 filename:%@ passphrase:%@",
                       fileName, passPhrase);
             NSString *clientPKCSPath = [directoryURL.path stringByAppendingPathComponent:fileName];
-            certificates = [MQTTTransport clientCertsFromP12:clientPKCSPath
-                                                  passphrase:passPhrase];
+            certificates = nil; // 改造版: MQTTを外したので証明書は使わない（clientPKCSPathは未使用）
+            (void)clientPKCSPath;
             if (!certificates) {
                 OwnTracksLogDefault("[OwnTracksAppDelegate] TLS Client Certificate incorrect file or passphrase");
                 [NavigationController alertWithTitle:

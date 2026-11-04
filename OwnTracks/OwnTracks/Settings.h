@@ -8,7 +8,7 @@
 
 #import <Foundation/Foundation.h>
 #import "Setting+CoreDataClass.h"
-#import "MQTTMessage.h"
+#import "Connection.h"
 
 typedef NS_ENUM(int, ConnectionMode) {
     CONNECTION_MODE_MQTT = 0,

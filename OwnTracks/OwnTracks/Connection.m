@@ -13,13 +13,11 @@
 
 #import <UIKit/UIKit.h>
 #import "OwnTracksLog.h"
-#import "Clibsodium/sodium.h"
 #import "LocationManager.h"
 #import "Settings.h"
 #import "OwnTracksAppDelegate.h"
 #import "Validation.h"
 
-#import "MQTTNWTransport.h"
 #import "OwnTracks-Swift.h"
 
 
@@ -32,7 +30,6 @@
 @property (nonatomic) double reconnectTime;
 @property (nonatomic) BOOL reconnectFlag;
 
-@property (strong, nonatomic) MQTTSession *session;
 
 @property (strong, nonatomic) NSString *url;
 @property (strong, nonatomic) NSMutableArray <NSDictionary <NSString *, NSString *> *> *httpHeaders;
@@ -76,12 +73,6 @@
     self = [super init];
     OwnTracksLogDebug("[Connection] Connection init");
     
-    if (sodium_init() == -1) {
-        OwnTracksLogError("[Connection] sodium_init failed");
-    } else {
-        OwnTracksLogDefault("[Connection] sodium_init succeeded");
-    }
-
     self.state = state_starting;
     self.subscriptions = [[NSArray alloc] init];
     
@@ -165,125 +156,10 @@
      withClientId:(NSString *)clientId
 allowUntrustedCertificates:(BOOL)allowUntrustedCertificates
      certificates:(NSArray *)certificates {
-    OwnTracksLogDefault("[Connection] %@ connectTo: %@:%@@%@:%ld v%d %{public}@ %{public}@ (%ld) c%d / %@ %@ q%ld r%d as %@ %d %@",
-                 self.clientId,
-                 auth ? user : @"",
-                 auth ? @"<passwd>" : @"",
-                 host,
-                 (long)port,
-                 protocolVersion,
-                 ws ? @"WS" : @"MQTT",
-                 tls ? @"TLS" : @"PLAIN",
-                 (long)keepalive,
-                 clean,
-                 willTopic,
-                 [[NSString alloc] initWithData:will encoding:NSUTF8StringEncoding],
-                 (long)willQos,
-                 willRetainFlag,
-                 clientId,
-                 allowUntrustedCertificates,
-                 certificates
-                 );
-    
+    // 改造版: MQTTは外した。HTTPだけで送る
+    OwnTracksLogDefault("[Connection] connectTo ignored (MQTT removed)");
     self.url = nil;
-    
-    if (!self.session ||
-        ![host isEqualToString:self.host] ||
-        port != self.port ||
-        ws != self.ws ||
-        tls != self.tls ||
-        keepalive != self.keepalive ||
-        clean != self.clean || force ||
-        auth != self.auth ||
-        ![user isEqualToString:self.user] ||
-        ![pass isEqualToString:self.pass] ||
-        ![willTopic isEqualToString:self.willTopic] ||
-        //![will isEqualToData:self.will] ||
-        willQos != self.willQos ||
-        willRetainFlag != self.willRetainFlag ||
-        ![clientId isEqualToString:self.clientId] ||
-        allowUntrustedCertificates != self.allowUntrustedCertificates ||
-        certificates != self.certificates ||
-        protocolVersion != self.protocolVersion) {
-        self.host = host;
-        self.port = (int)port;
-        self.protocolVersion = protocolVersion;
-        self.ws = ws;
-        self.tls = tls;
-        self.keepalive = keepalive;
-        self.clean = clean;
-        self.auth = auth;
-        self.user = user;
-        self.pass = pass;
-        self.willTopic = willTopic;
-        self.will = will;
-        self.willQos = willQos;
-        self.willRetainFlag = willRetainFlag;
-        self.clientId = clientId;
-        self.allowUntrustedCertificates = allowUntrustedCertificates;
-        self.certificates = certificates;
-        
-        self.session = [self newMQTTSession:force];
-    }
-    [self connectToInternal];
-}
-
-- (MQTTSession *)newMQTTSession:(BOOL)force {
-    OwnTracksLogDefault("[Connection] newMQTTSession");
-    MQTTSession *session;
-    MQTTTransport *mqttTransport;
-
-    MQTTNWTransport *nwTransport = [[MQTTNWTransport alloc] init];
-    nwTransport.host = self.host;
-    nwTransport.port = self.port;
-    nwTransport.tls = self.tls;
-    nwTransport.ws = self.ws;
-    nwTransport.allowUntrustedCertificates = self.allowUntrustedCertificates;
-    nwTransport.certificates = self.certificates;
-    mqttTransport = nwTransport;
-    
-    session = [[MQTTSession alloc] init];
-    session.transport = mqttTransport;
-    session.clientId = self.clientId;
-    session.userName = self.auth ? self.user : nil;
-    session.password = self.auth ? self.pass : nil;
-    session.keepAliveInterval = self.keepalive;
-    session.connackTimeoutInterval = self.keepalive;
-    // at forced connect, clean session to avoid unsynced status with broker
-    if (force) {
-        session.cleanSessionFlag = TRUE;
-    } else {
-        session.cleanSessionFlag = self.clean;
-    }
-    session.topicAliasMaximum = @(10);
-    session.sessionExpiryInterval = @(0xFFFFFFFF);
-
-    if (self.willTopic) {
-        MQTTWill *mqttWill = [[MQTTWill alloc] initWithTopic:self.willTopic
-                                                        data:self.will
-                                                  retainFlag:self.willRetainFlag
-                                                         qos:self.willQos
-                                           willDelayInterval:nil
-                                      payloadFormatIndicator:nil
-                                       messageExpiryInterval:nil
-                                                 contentType:nil
-                                               responseTopic:nil
-                                             correlationData:nil
-                                              userProperties:nil];
-        session.will = mqttWill;
-    }
-
-    session.protocolLevel = self.protocolVersion;
-    session.persistence.persistent = TRUE;
-    session.persistence.maxMessages = 100 * 1024;
-    session.persistence.maxSize = 100 * 1024 * 1024;
-
-    session.delegate = self;
-
-    self.reconnectTime = RECONNECT_TIMER;
-    self.reconnectFlag = FALSE;
-
-    return session;
+    self.port = 0;
 }
 
 - (void)URLSession:(NSURLSession *)session
@@ -375,39 +251,7 @@ willPerformHTTPRedirection:(NSHTTPURLResponse *)redirectResponse
         
         return 0;
     } else {
-        if (self.port == 0) {
-            return 0;
-        }
-        
-        if (self.state != state_connected) {
-            [self connectToLast];
-        }
-
-        NSData *outgoingData = (self.key && self.key.length) ? [self encrypt:data] : data;
-
-        NSNumber *effectiveTopicAlias = nil;
-
-        if (topicAlias &&
-            topicAlias.unsignedIntValue > 0 &&
-            self.session.brokerTopicAliasMaximum &&
-            self.session.brokerTopicAliasMaximum.unsignedIntValue >= topicAlias.unsignedIntValue) {
-            effectiveTopicAlias = topicAlias;
-        }
-
-        UInt16 msgId = [self.session publishDataV5:outgoingData
-                                           onTopic:topic
-                                            retain:retainFlag
-                                               qos:qos
-                            payloadFormatIndicator:nil
-                             messageExpiryInterval:nil
-                                        topicAlias:effectiveTopicAlias
-                                     responseTopic:nil
-                                   correlationData:nil
-                                    userProperties:nil
-                                       contentType:nil
-                                    publishHandler:nil];
-        OwnTracksLogDebug("[Connection] sendData mid=%u", msgId);
-        return msgId;
+        return 0;
     }
 }
 
@@ -609,12 +453,6 @@ willPerformHTTPRedirection:(NSHTTPURLResponse *)redirectResponse
     if (!self.url) {
         self.intendedDisconnect = TRUE;
         self.state = state_closing;
-        [self.session closeWithReturnCode:MQTTSuccess
-                    sessionExpiryInterval:nil
-                             reasonString:nil
-                           userProperties:nil
-                        disconnectHandler:nil];
-
         if (self.reconnectTimer) {
             if (self.reconnectTimer.isValid) {
                 [self.reconnectTimer invalidate];
@@ -647,203 +485,10 @@ willPerformHTTPRedirection:(NSHTTPURLResponse *)redirectResponse
     [self.delegate totalBuffered:self count:0];
 }
 
-#pragma mark - MQTT Callback methods
-
-- (void)connected:(MQTTSession *)session sessionPresent:(BOOL)sessionPresent {
-
-    OwnTracksLogDefault("[Connection] connected sessionPresent %d",
-              sessionPresent);
-
-    self.lastErrorCode = nil;
-    self.state = state_connected;
-    
-    /*
-     * if clean-session is set or
-     * if it's the first time we connect in non-clean-session-mode or
-     * we can assume the broker doesn't know anymore
-     * subscribe to topic
-     */
-    if (self.clean || !self.reconnectFlag || !sessionPresent) {
-        for (NSString *topicFilter in self.subscriptions) {
-            if (topicFilter.length) {
-                OwnTracksLogDebug("[Connection] subscribe %@ qos=%d",
-                          topicFilter, self.subscriptionQos);
-
-                UInt16 mid = [self.session subscribeToTopicV5:topicFilter
-                                                      atLevel:self.subscriptionQos
-                                                      noLocal:self.protocolVersion >= MQTTProtocolVersion50 ?
-                                                        TRUE : FALSE
-                                            retainAsPublished:FALSE
-                                               retainHandling:MQTTSendRetained
-                                       subscriptionIdentifier:0
-                                               userProperties:nil
-                                             subscribeHandler:nil];
-                OwnTracksLogDebug("[Connection] subscription mid=%d",
-                          mid);
-            }
-        }
-        self.reconnectFlag = TRUE;
-    }
-}
-
-- (void)handleEvent:(MQTTSession *)session event:(MQTTSessionEvent)eventCode error:(NSError *)error {
-    OwnTracksLogDefault("[Connection] %@ MQTT eventCode: (%ld) %@",
-                 @{@(MQTTSessionEventConnected): @"connected",
-                   @(MQTTSessionEventConnectionRefused): @"connection refused",
-                   @(MQTTSessionEventConnectionClosed): @"connection closed",
-                   @(MQTTSessionEventConnectionError): @"connection error",
-                   @(MQTTSessionEventProtocolError): @"protocol error",
-                   @(MQTTSessionEventConnectionClosedByBroker): @"connection closed by broker"
-                   }[@(eventCode)],
-                 (long)eventCode, error);
-    
-    if (self.reconnectTimer) {
-        if (self.reconnectTimer.isValid) {
-            [self.reconnectTimer invalidate];
-        }
-        self.reconnectTimer = nil;
-    }
-    switch (eventCode) {
-        case MQTTSessionEventConnected:
-            self.reconnectTime = RECONNECT_TIMER;
-            // more handled in connected callback
-            break;
-        case MQTTSessionEventConnectionClosed:
-        case MQTTSessionEventConnectionClosedByBroker:
-            /* this informs the caller that the connection is closed
-             * specifically, the caller can end the background task now */
-            self.state = state_closed;
-            self.state = state_starting;
-            if (!self.intendedDisconnect) {
-                [self startReconnectTimer:[NSRunLoop mainRunLoop]];
-            } else {
-                self.intendedDisconnect = FALSE;
-            }
-            if (!self.lastErrorCode) {
-                self.lastErrorCode = error;
-            }
-            break;
-        case MQTTSessionEventProtocolError:
-        case MQTTSessionEventConnectionRefused:
-        case MQTTSessionEventConnectionError: {
-            OwnTracksLogError("[Connection] error.code %ld, error %@",
-                       error.code,
-                       error);
-            if (error.domain == NSOSStatusErrorDomain && error.code == errSSLPeerCertUnknown) {
-                self.session = nil;
-            }
-            [self startReconnectTimer:[NSRunLoop mainRunLoop]];
-            self.state = state_error;
-            if (!self.lastErrorCode) {
-                self.lastErrorCode = error;
-            }
-            break;
-        }
-        default:
-            break;
-    }
-}
-
-- (void)subAckReceivedV5:(MQTTSession *)session
-                   msgID:(UInt16)msgID
-            reasonString:(NSString *)reasonString
-          userProperties:(NSArray<NSDictionary<NSString *,NSString *> *> *)userProperties
-             reasonCodes:(NSArray<NSNumber *> *)reasonCodes {
-    OwnTracksLogDebug("[Connection] subAckReceived mid=%u reasonCodes=%@ userProperties=%@",
-              msgID,
-              [reasonCodes componentsJoinedByString:@", "],
-              userProperties);
-}
-
-- (void)unsubAckReceivedV5:(MQTTSession *)session
-                     msgID:(UInt16)msgID
-              reasonString:(NSString *)reasonString
-            userProperties:(NSArray<NSDictionary<NSString *,NSString *> *> *)userProperties
-               reasonCodes:(NSArray<NSNumber *> *)reasonCodes {
-    OwnTracksLogDebug("[Connection] unsubAckReceived mid=%u rs=%@ rc=%@ up=%@",
-              msgID,
-              reasonString,
-              reasonCodes,
-              userProperties);
-}
-
-- (void)messageDeliveredV5:(MQTTSession *)session
-                     msgID:(UInt16)msgID
-                     topic:(NSString *)topic
-                      data:(NSData *)data
-                       qos:(MQTTQosLevel)qos
-                retainFlag:(BOOL)retainFlag
-    payloadFormatIndicator:(NSNumber *)payloadFormatIndicator
-     messageExpiryInterval:(NSNumber *)messageExpiryInterval
-                topicAlias:(NSNumber *)topicAlias
-             responseTopic:(NSString *)responseTopic
-           correlationData:(NSData *)correlationData
-            userProperties:(NSArray<NSDictionary<NSString *,NSString *> *> *)userProperties
-               contentType:(NSString *)contentType {
-    OwnTracksLogDefault("[Connection] messageDelivered mid=%u", msgID);
-    [self.delegate messageDelivered:self msgID:msgID];
-}
-
-- (BOOL)newMessageWithFeedbackV5:(MQTTSession *)session
-                            data:(NSData *)data
-                         onTopic:(NSString *)topic
-                             qos:(MQTTQosLevel)qos
-                        retained:(BOOL)retained
-                             mid:(unsigned int)mid
-          payloadFormatIndicator:(NSNumber *)payloadFormatIndicator
-           messageExpiryInterval:(NSNumber *)messageExpiryInterval
-                      topicAlias:(NSNumber *)topicAlias
-                   responseTopic:(NSString *)responseTopic
-                 correlationData:(NSData *)correlationData
-                  userProperties:(NSArray<NSDictionary<NSString *,NSString *> *> *)userProperties
-                     contentType:(NSString *)contentType
-         subscriptionIdentifiers:(NSArray<NSNumber *> *)subscriptionIdentifiers {
-
-    if (self.key && self.key.length) {
-        data = [self decrypt:data];
-    }
-
-#define LEN2PRINT 128
-    NSString *dataString = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
-    OwnTracksLogDefault("[Connection] received topic=%@ dataString(%lu)=%@",
-              topic,
-              (unsigned long)dataString.length,
-              dataString.length <= LEN2PRINT ?
-              dataString :
-              [NSString stringWithFormat:@"%@...", [dataString substringToIndex:LEN2PRINT]]);
-    return [self.delegate handleMessage:self
-                                   data:data
-                                onTopic:topic
-                               retained:retained];
-}
-
-- (void)buffered:(MQTTSession *)session
-       flowingIn:(NSUInteger)flowingIn
-      flowingOut:(NSUInteger)flowingOut {
-    OwnTracksLogDebug("[Connection] buffered i%lu o%lu",
-                 (unsigned long)flowingIn,
-                 (unsigned long)flowingOut);
-    self.inCount = flowingIn;
-    self.outCount = flowingOut;
-    [self.delegate totalBuffered: self count:flowingOut ? flowingOut : flowingIn];
-}
-
 #pragma internal helpers
 
 - (void)connectToInternal {
-    if (!self.url) {
-        if (self.state == state_starting) {
-            self.state = state_connecting;
-            if (!self.session) {
-                self.session = [self newMQTTSession:FALSE];
-            }
-            [self.session connectWithConnectHandler:nil];
-            // reset cleanSession flag which might have forced to TRUE
-            self.session.cleanSessionFlag = self.clean;
-        } else {
-            OwnTracksLogDefault("[Connection] not starting (%ld), can't connect", (long)self.state);
-        }
-    }
+    // 改造版: HTTPだけなので接続の処理は無い
 }
 
 - (NSString *)parameters {
@@ -918,89 +563,13 @@ willPerformHTTPRedirection:(NSHTTPURLResponse *)redirectResponse
     [runLoop addTimer:self.reconnectTimer forMode:NSDefaultRunLoopMode];
 }
 
+// 改造版: libsodiumを外した。暗号化はしない
 - (NSData *)encrypt:(NSData *)message {
-    
-    unsigned char nonce[crypto_secretbox_NONCEBYTES];
-    randombytes_buf(nonce, sizeof nonce);
-    
-    unsigned char key[crypto_secretbox_KEYBYTES];
-    memset(key, 0, sizeof(key));
-    [self.key getBytes:key
-             maxLength:sizeof(key)
-            usedLength:nil
-              encoding:NSUTF8StringEncoding
-               options:0
-                 range:NSMakeRange(0, self.key.length)
-        remainingRange:nil];
-    
-    NSMutableData *ciphertext = [NSMutableData dataWithLength:message.length + crypto_secretbox_MACBYTES];
-    crypto_secretbox_easy(ciphertext.mutableBytes, message.bytes, message.length, nonce, key);
-    
-    NSMutableData *onTheWire = [NSMutableData dataWithBytes:nonce length:crypto_secretbox_NONCEBYTES];
-    [onTheWire appendData:ciphertext];
-    
-    NSDictionary *json = @{
-                           @"_type": @"encrypted",
-                           @"data": [onTheWire base64EncodedStringWithOptions:0]
-                           };
-    
-    return [NSJSONSerialization dataWithJSONObject:json options:0 error:nil];
+    return message;
 }
 
 - (NSData *)decrypt:(NSData *)data {
-    NSString *b64String;
-    
-    id json = [[Validation sharedInstance] validateEncryptionData:data];
-    if (json && [json isKindOfClass:[NSDictionary class]]) {
-        NSDictionary *dictionary = json;
-        NSString *type = dictionary[@"_type"];
-        if (type && [type isKindOfClass:[NSString class]]) {
-            if ([type isEqualToString:@"encrypted"]) {
-                b64String = dictionary[@"data"];
-                if (!b64String) {
-                    return data;
-                }
-            } else {
-                return data;
-            }
-        } else {
-            return data;
-        }
-    } else {
-        return data;
-    }
-    NSData *onTheWire = [[NSData alloc] initWithBase64EncodedString:b64String
-                                                            options:0];
-    if (!onTheWire) {
-        return data;
-    }
-    
-    NSData *nonce = [onTheWire subdataWithRange:NSMakeRange(0, crypto_secretbox_NONCEBYTES)];
-    NSData *ciphertext = [onTheWire subdataWithRange:NSMakeRange(crypto_secretbox_NONCEBYTES,
-                                                                 onTheWire.length - crypto_secretbox_NONCEBYTES)];
-    
-    unsigned char key[crypto_secretbox_KEYBYTES];
-    memset(key, 0, sizeof(key));
-    [self.key getBytes:key
-             maxLength:sizeof(key)
-            usedLength:nil
-              encoding:NSUTF8StringEncoding
-               options:0
-                 range:NSMakeRange(0, self.key.length)
-        remainingRange:nil];
-    
-    NSMutableData *decrypted = [NSMutableData dataWithLength:ciphertext.length - crypto_secretbox_MACBYTES];
-    if (crypto_secretbox_open_easy(decrypted.mutableBytes,
-                                   ciphertext.bytes ,
-                                   ciphertext.length,
-                                   nonce
-                                   .bytes,
-                                   key) != 0) {
-        decrypted = [NSMutableData data];
-    }
-    
-    return decrypted;
+    return data;
 }
-
 
 @end

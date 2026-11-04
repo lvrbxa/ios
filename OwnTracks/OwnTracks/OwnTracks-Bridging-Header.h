@@ -13,4 +13,4 @@
 #import "Setting+CoreDataClass.h"
 #import "Settings.h"
 #import "OwnTracking.h"
-#import "MQTTMessage.h"
+#import "Connection.h"
