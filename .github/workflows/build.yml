@@ -1,0 +1,22 @@
+name: build
+on:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build (unsigned)
+        run: |
+          xcodebuild -project OwnTracks/OwnTracks.xcodeproj -scheme OwnTracks \
+            -configuration Release -sdk iphoneos -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build
+      - name: Package IPA
+        run: |
+          mkdir Payload
+          cp -R build/Build/Products/Release-iphoneos/OwnTracks.app Payload/
+          zip -qry OwnTracks.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OwnTracks-ipa
+          path: OwnTracks.ipa
