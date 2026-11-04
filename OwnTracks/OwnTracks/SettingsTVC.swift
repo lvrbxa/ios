@@ -804,72 +804,14 @@ class SettingsTVC: UITableViewController, UIDocumentInteractionControllerDelegat
     }
     
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
-        if segue.identifier == "setClientPKCS" {
-            if segue.destination is CertificatesTVC {
-                let cTVC = segue.destination as? CertificatesTVC;
-                cTVC!.selectedFileName = Settings.string(forKey: "clientpkcs", inMOC: CoreData.sharedInstance().mainMOC) ?? "";
-            }
-        }
-        
+        // 改造版: この画面は削った
     }
     @IBAction func setNames(_ segue: UIStoryboardSegue) {
-        if segue.source is CertificatesTVC {
-            let cTVC = segue.source as? CertificatesTVC;
-            let name = cTVC!.selectedFileName;
-            Settings.setString(name as NSObject, forKey: "clientpkcs", inMOC: CoreData.sharedInstance().mainMOC);
-            updated();
-        }
+        // 改造版: この画面は削った
     }
     
     @IBAction func setCard(_ segue: UIStoryboardSegue) {
-        if segue.source is CreateCardTVC {
-            let cTVC = segue.source as? CreateCardTVC;
-            let name = cTVC!.name;
-            let cardImage = cTVC!.cardImage;
-            
-            let moc = CoreData.sharedInstance().mainMOC;
-            let ad = UIApplication.shared.delegate as! OwnTracksAppDelegate;
-            
-            if name != nil && cardImage != nil {
-                if cardImage!.image != nil && name!.text != nil {
-                    let png = cardImage!.image!.pngData();
-                    if png != nil {
-                        let topic = Settings.theGeneralTopic(inMOC: moc) as String?;
-                        if topic != nil {
-                            let myself = Friend.existsFriend(withTopic: topic!, in: moc);
-                            if myself != nil {
-                                myself!.cardName = name!.text!;
-                                myself!.cardImage = png;
-                                let b64String = png!.base64EncodedString();
-                                let json = [
-                                    "_type": "card",
-                                    "face": b64String,
-                                    "name": name!.text!
-                                ];
-                                
-                                var jsonData: Data? = nil;
-                                do {
-                                    jsonData = try JSONSerialization.data(withJSONObject: json, options: .sortedKeys);
-                                } catch {
-                                }
-                                if jsonData != nil  && ad.connection != nil {
-                                    ad.connection!.send(jsonData,
-                                                        topic: Settings.theGeneralTopic(inMOC: moc) + "/info",
-                                                        topicAlias: NSNumber(value: 0),
-                                                        qos: Settings.theQos(inMOC: moc),
-                                                        retain: true);
-                                    
-                                    NavigationController.alert(title: NSLocalizedString("Card",
-                                                                                        comment: "Header of an alert message regarding a card"),
-                                                               message: NSLocalizedString("set and sent to backend",
-                                                                                          comment: "content of an alert message regarding card"));
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        // 改造版: この画面は削った
     }
     
     @IBAction func touchedOutsideText(_ sender: UITapGestureRecognizer) {

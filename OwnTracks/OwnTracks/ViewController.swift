@@ -746,7 +746,7 @@ class ViewController: UIViewController, MKMapViewDelegate, NSFetchedResultsContr
     }
     
     func setPOIWithImage() {
-        performSegue(withIdentifier: "AttachPhotoSegue", sender: nil);
+        // 改造版: この画面は削った
     }
     
     func setTag() {
@@ -780,14 +780,7 @@ class ViewController: UIViewController, MKMapViewDelegate, NSFetchedResultsContr
     }
     
     @IBAction func attachPhoto(_ segue: UIStoryboardSegue) {
-        if segue.source is AttachPhotoTVC {
-            let attachPhotoTVC = segue.source as! AttachPhotoTVC;
-            let poi = attachPhotoTVC.poi;
-            let photo = attachPhotoTVC.photo;
-            let imageName = attachPhotoTVC.imageName;
-            let jpg = photo?.image?.jpegData(compressionQuality: 0.9);
-            sendNow(poi: poi!.text, image: jpg!, imageName: imageName);
-        }
+        // 改造版: この画面は削った
     }
     
     func mapView(_ mapView: MKMapView, rendererFor overlay: any MKOverlay) -> MKOverlayRenderer {

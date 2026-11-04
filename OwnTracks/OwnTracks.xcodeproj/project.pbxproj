@@ -9,11 +9,9 @@
 /* Begin PBXBuildFile section */
 		84001C141C78982800413E5B /* Queue+CoreDataProperties.m in Sources */ = {isa = PBXBuildFile; fileRef = 84001C111C78982800413E5B /* Queue+CoreDataProperties.m */; };
 		8400D9731D83825E00DEA134 /* HTTP.plist in Resources */ = {isa = PBXBuildFile; fileRef = 8400D9721D83825E00DEA134 /* HTTP.plist */; };
-		8405CB602F14EBEF008C2580 /* CreateCardTVC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8405CB5F2F14EBEF008C2580 /* CreateCardTVC.swift */; };
 		8405CB622F153DD9008C2580 /* ModesTVC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8405CB612F153DD9008C2580 /* ModesTVC.swift */; };
 		8408CA4425F00FB400354FF3 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 84F9622525F008EC007A391A /* InfoPlist.strings */; };
 		840CA94F2F4DF83C00FD30C1 /* SettingsTVC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 840CA94E2F4DF83C00FD30C1 /* SettingsTVC.swift */; };
-		840CA9512F50377300FD30C1 /* HistoryTVC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 840CA9502F50377300FD30C1 /* HistoryTVC.swift */; };
 		840CA9532F507F6B00FD30C1 /* OwnTracksEditFetchTVC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 840CA9522F507F6B00FD30C1 /* OwnTracksEditFetchTVC.swift */; };
 		840CA9572F50986C00FD30C1 /* RegionsTVC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 840CA9562F50986C00FD30C1 /* RegionsTVC.swift */; };
 		840CA9592F50BA6500FD30C1 /* RegionTVC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 840CA9542F50982600FD30C1 /* RegionTVC.swift */; };
@@ -37,7 +35,6 @@
 		842E6ED520BEF031001928FA /* Setting+CoreDataClass.m in Sources */ = {isa = PBXBuildFile; fileRef = 842E6ED020BEF031001928FA /* Setting+CoreDataClass.m */; };
 		842E6ED620BEF031001928FA /* Queue+CoreDataClass.m in Sources */ = {isa = PBXBuildFile; fileRef = 842E6ED220BEF031001928FA /* Queue+CoreDataClass.m */; };
 		842E6ED720BEF031001928FA /* Waypoint+CoreDataClass.m in Sources */ = {isa = PBXBuildFile; fileRef = 842E6ED420BEF031001928FA /* Waypoint+CoreDataClass.m */; };
-		842ECC582F029DA700C46FBC /* ToursTVC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84F0A43F2F0173C000FF2D0B /* ToursTVC.swift */; };
 		8436DFD62BA9D72F00118AFF /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 8436DFD52BA9D72F00118AFF /* PrivacyInfo.xcprivacy */; };
 		8436DFDC2BA9DD6100118AFF /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 8436DFDB2BA9DD6100118AFF /* PrivacyInfo.xcprivacy */; };
 		843A57AB24A9A4D600A5441B /* IntentHandler.m in Sources */ = {isa = PBXBuildFile; fileRef = 843A57AA24A9A4D600A5441B /* IntentHandler.m */; };
@@ -55,7 +52,6 @@
 		846EFA372F69B9E20088232B /* WaypointTVC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 846EFA362F69B9E20088232B /* WaypointTVC.swift */; };
 		846EFA392F6A963E0088232B /* OwnTracksEditTVC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 846EFA382F6A963E0088232B /* OwnTracksEditTVC.swift */; };
 		846EFA3B2F6ABED20088232B /* TabBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 846EFA3A2F6ABED20088232B /* TabBarController.swift */; };
-		846EFA3D2F6ADF6C0088232B /* AttachPhotoTVC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 846EFA3C2F6ADF6C0088232B /* AttachPhotoTVC.swift */; };
 		846EFA3F2F6BECDF0088232B /* NavigationController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 846EFA3E2F6BECDF0088232B /* NavigationController.swift */; };
 		8470352923D5E6B10041AAFB /* SystemConfiguration.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8470352823D5E6B10041AAFB /* SystemConfiguration.framework */; };
 		8474443A1DA4BC9600975BE4 /* ConnType.m in Sources */ = {isa = PBXBuildFile; fileRef = 847444391DA4BC9600975BE4 /* ConnType.m */; };
@@ -70,8 +66,6 @@
 		849260442B0373E300F6DC13 /* encryption.json in Resources */ = {isa = PBXBuildFile; fileRef = 849260432B0373E300F6DC13 /* encryption.json */; };
 		849260462B037B0000F6DC13 /* messages.json in Resources */ = {isa = PBXBuildFile; fileRef = 849260452B037B0000F6DC13 /* messages.json */; };
 		84929F0B20AAC0D000227D00 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 84929F0A20AAC0CF00227D00 /* WebKit.framework */; };
-		849551F52EF41EAE00675342 /* CreateTourTVC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 849551F42EF41EAE00675342 /* CreateTourTVC.swift */; };
-		849551F72EF42D4300675342 /* ToursStatusCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 849551F62EF42D4300675342 /* ToursStatusCell.swift */; };
 		84A452BA2F35157000AA6A29 /* StatusTVC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84A452B92F35156F00AA6A29 /* StatusTVC.swift */; };
 		84AFD40B2434486200F1E922 /* OwnTracking.m in Sources */ = {isa = PBXBuildFile; fileRef = 84AFD40A2434486200F1E922 /* OwnTracking.m */; };
 		84B0CDAD239E2EFA00CE9305 /* BackgroundTasks.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 84B0CDAC239E2EFA00CE9305 /* BackgroundTasks.framework */; };
@@ -86,7 +80,6 @@
 		84D6B47D25C844A500B2AC07 /* NSNumber+decimals.m in Sources */ = {isa = PBXBuildFile; fileRef = 84D6B47C25C844A500B2AC07 /* NSNumber+decimals.m */; };
 		84DB10222F6C54D900DF0651 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84DB101F2F6C41D500DF0651 /* ViewController.swift */; };
 		84DC826F2E0757CE0045CD05 /* OwnTracksBatteryTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 84DC826E2E0757CE0045CD05 /* OwnTracksBatteryTests.m */; };
-		84DD1CFC2F431FBA00BB15C2 /* CertificatesTVC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84DD1CFB2F431FBA00BB15C2 /* CertificatesTVC.swift */; };
 		84DE749824A9E1C600C0DA68 /* Intents.intentdefinition in Sources */ = {isa = PBXBuildFile; fileRef = 84DE749B24A9E1C600C0DA68 /* Intents.intentdefinition */; };
 		84DE749924A9E1C600C0DA68 /* Intents.intentdefinition in Sources */ = {isa = PBXBuildFile; fileRef = 84DE749B24A9E1C600C0DA68 /* Intents.intentdefinition */; };
 		84E03DBC2F655996006756BE /* PersonTVC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84E03DBB2F655996006756BE /* PersonTVC.swift */; };
@@ -152,11 +145,9 @@
 		84001C111C78982800413E5B /* Queue+CoreDataProperties.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "Queue+CoreDataProperties.m"; sourceTree = "<group>"; };
 		8400D9721D83825E00DEA134 /* HTTP.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = HTTP.plist; sourceTree = "<group>"; };
 		8400D9741D84946E00DEA134 /* Model 9.1.7.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = "Model 9.1.7.xcdatamodel"; sourceTree = "<group>"; };
-		8405CB5F2F14EBEF008C2580 /* CreateCardTVC.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateCardTVC.swift; sourceTree = "<group>"; };
 		8405CB612F153DD9008C2580 /* ModesTVC.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModesTVC.swift; sourceTree = "<group>"; };
 		840BBDD318E4274200DC113C /* Model 6.2.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = "Model 6.2.xcdatamodel"; sourceTree = "<group>"; };
 		840CA94E2F4DF83C00FD30C1 /* SettingsTVC.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsTVC.swift; sourceTree = "<group>"; };
-		840CA9502F50377300FD30C1 /* HistoryTVC.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryTVC.swift; sourceTree = "<group>"; };
 		840CA9522F507F6B00FD30C1 /* OwnTracksEditFetchTVC.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OwnTracksEditFetchTVC.swift; sourceTree = "<group>"; };
 		840CA9542F50982600FD30C1 /* RegionTVC.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegionTVC.swift; sourceTree = "<group>"; };
 		840CA9562F50986C00FD30C1 /* RegionsTVC.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegionsTVC.swift; sourceTree = "<group>"; };
@@ -229,7 +220,6 @@
 		846EFA362F69B9E20088232B /* WaypointTVC.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaypointTVC.swift; sourceTree = "<group>"; };
 		846EFA382F6A963E0088232B /* OwnTracksEditTVC.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OwnTracksEditTVC.swift; sourceTree = "<group>"; };
 		846EFA3A2F6ABED20088232B /* TabBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabBarController.swift; sourceTree = "<group>"; };
-		846EFA3C2F6ADF6C0088232B /* AttachPhotoTVC.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttachPhotoTVC.swift; sourceTree = "<group>"; };
 		846EFA3E2F6BECDF0088232B /* NavigationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationController.swift; sourceTree = "<group>"; };
 		846FFA1B1B4023BE001482A6 /* Model 8.2.0.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = "Model 8.2.0.xcdatamodel"; sourceTree = "<group>"; };
 		846FFA431B402A1F001482A6 /* OwnTracking.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OwnTracking.h; sourceTree = "<group>"; };
@@ -267,8 +257,6 @@
 		84930A2D1B376DDF00810C3A /* Model 8.1.3.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = "Model 8.1.3.xcdatamodel"; sourceTree = "<group>"; };
 		84930A311B37729000810C3A /* Model 8.1.4.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = "Model 8.1.4.xcdatamodel"; sourceTree = "<group>"; };
 		849551F32EF41EAE00675342 /* OwnTracks-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "OwnTracks-Bridging-Header.h"; sourceTree = "<group>"; };
-		849551F42EF41EAE00675342 /* CreateTourTVC.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateTourTVC.swift; sourceTree = "<group>"; };
-		849551F62EF42D4300675342 /* ToursStatusCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToursStatusCell.swift; sourceTree = "<group>"; };
 		849ABA0028F21D140078AE41 /* Model 16.3.0.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = "Model 16.3.0.xcdatamodel"; sourceTree = "<group>"; };
 		849B1E021FE9114C0016EF1A /* pl */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = pl; path = pl.lproj/Localizable.strings; sourceTree = "<group>"; };
 		849B359924A7578000BEC1BB /* Intents.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Intents.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.15.sdk/System/Library/Frameworks/Intents.framework; sourceTree = DEVELOPER_DIR; };
@@ -339,7 +327,6 @@
 		84DC687D2CA5603700FCFE44 /* gl */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = gl; path = gl.lproj/Intents.strings; sourceTree = "<group>"; };
 		84DC687F2CA5603A00FCFE44 /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/Intents.strings; sourceTree = "<group>"; };
 		84DC826E2E0757CE0045CD05 /* OwnTracksBatteryTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = OwnTracksBatteryTests.m; sourceTree = "<group>"; };
-		84DD1CFB2F431FBA00BB15C2 /* CertificatesTVC.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CertificatesTVC.swift; sourceTree = "<group>"; };
 		84DE749724A9A68B00C0DA68 /* OwnTracksIntents.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = OwnTracksIntents.entitlements; sourceTree = "<group>"; };
 		84DE749A24A9E1C600C0DA68 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.intentdefinition; name = Base; path = Base.lproj/Intents.intentdefinition; sourceTree = "<group>"; };
 		84E03DBB2F655996006756BE /* PersonTVC.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonTVC.swift; sourceTree = "<group>"; };
@@ -357,7 +344,6 @@
 		84E8A1811BB94782002518AA /* Friend+CoreDataProperties.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "Friend+CoreDataProperties.m"; sourceTree = "<group>"; };
 		84E8A1861BB94782002518AA /* Region+CoreDataProperties.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "Region+CoreDataProperties.h"; sourceTree = "<group>"; };
 		84E8A1871BB94782002518AA /* Region+CoreDataProperties.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "Region+CoreDataProperties.m"; sourceTree = "<group>"; };
-		84F0A43F2F0173C000FF2D0B /* ToursTVC.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToursTVC.swift; sourceTree = "<group>"; };
 		84F0AFE31C830C1D00C9F69F /* AddressBookUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AddressBookUI.framework; path = System/Library/Frameworks/AddressBookUI.framework; sourceTree = SDKROOT; };
 		84F0AFE51C830C2C00C9F69F /* AddressBook.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AddressBook.framework; path = System/Library/Frameworks/AddressBook.framework; sourceTree = SDKROOT; };
 		84F468E21AD484CC00CF8C4F /* Model 8.0.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = "Model 8.0.xcdatamodel"; sourceTree = "<group>"; };
@@ -609,11 +595,9 @@
 				846EFA3A2F6ABED20088232B /* TabBarController.swift */,
 				846EFA3E2F6BECDF0088232B /* NavigationController.swift */,
 				84DB101F2F6C41D500DF0651 /* ViewController.swift */,
-				846EFA3C2F6ADF6C0088232B /* AttachPhotoTVC.swift */,
 				84E3AE8D2F62BBC8009335B6 /* PhotoAnnotationV.swift */,
 				846EFA382F6A963E0088232B /* OwnTracksEditTVC.swift */,
 				840CA9522F507F6B00FD30C1 /* OwnTracksEditFetchTVC.swift */,
-				840CA9502F50377300FD30C1 /* HistoryTVC.swift */,
 				84A1737A1B428F0600CCB7D0 /* Friends */,
 				84A1737B1B428F3600CCB7D0 /* Regions */,
 				84A1737C1B428F3E00CCB7D0 /* Settings */,
@@ -651,11 +635,6 @@
 				840CA94E2F4DF83C00FD30C1 /* SettingsTVC.swift */,
 				8405CB612F153DD9008C2580 /* ModesTVC.swift */,
 				84A452B92F35156F00AA6A29 /* StatusTVC.swift */,
-				84DD1CFB2F431FBA00BB15C2 /* CertificatesTVC.swift */,
-				8405CB5F2F14EBEF008C2580 /* CreateCardTVC.swift */,
-				84F0A43F2F0173C000FF2D0B /* ToursTVC.swift */,
-				849551F62EF42D4300675342 /* ToursStatusCell.swift */,
-				849551F42EF41EAE00675342 /* CreateTourTVC.swift */,
 				849551F32EF41EAE00675342 /* OwnTracks-Bridging-Header.h */,
 			);
 			name = Settings;
@@ -881,26 +860,20 @@
 		8411B824189FDB140019D2D6 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			files = (
-				849551F52EF41EAE00675342 /* CreateTourTVC.swift in Sources */,
 				8411B83A189FDB140019D2D6 /* main.m in Sources */,
 				84DE749824A9E1C600C0DA68 /* Intents.intentdefinition in Sources */,
-				849551F72EF42D4300675342 /* ToursStatusCell.swift in Sources */,
 				84DB10222F6C54D900DF0651 /* ViewController.swift in Sources */,
 				846EFA352F682A4E0088232B /* FriendTableViewCell.swift in Sources */,
 				84E40204231413D400F1D6E6 /* History+CoreDataClass.m in Sources */,
 				846EFA3F2F6BECDF0088232B /* NavigationController.swift in Sources */,
 				8405CB622F153DD9008C2580 /* ModesTVC.swift in Sources */,
 				84001C141C78982800413E5B /* Queue+CoreDataProperties.m in Sources */,
-				842ECC582F029DA700C46FBC /* ToursTVC.swift in Sources */,
 				846EFA372F69B9E20088232B /* WaypointTVC.swift in Sources */,
 				8411B87F189FE35C0019D2D6 /* Model.xcdatamodeld in Sources */,
 				840CA94F2F4DF83C00FD30C1 /* SettingsTVC.swift in Sources */,
 				84E8A1891BB94782002518AA /* Setting+CoreDataProperties.m in Sources */,
 				840CA9592F50BA6500FD30C1 /* RegionTVC.swift in Sources */,
-				846EFA3D2F6ADF6C0088232B /* AttachPhotoTVC.swift in Sources */,
 				846EFA392F6A963E0088232B /* OwnTracksEditTVC.swift in Sources */,
-				84DD1CFC2F431FBA00BB15C2 /* CertificatesTVC.swift in Sources */,
-				8405CB602F14EBEF008C2580 /* CreateCardTVC.swift in Sources */,
 				8474443A1DA4BC9600975BE4 /* ConnType.m in Sources */,
 				842E6ED620BEF031001928FA /* Queue+CoreDataClass.m in Sources */,
 				84BDD0D12F2A815500358CC2 /* OwnTracksLog.m in Sources */,
@@ -917,7 +890,6 @@
 				847667B32DF9B8C7001AD950 /* Waypoint+CoreDataProperties.m in Sources */,
 				84E3AE8E2F62BBC8009335B6 /* PhotoAnnotationV.swift in Sources */,
 				849260422B0247C200F6DC13 /* Validation.m in Sources */,
-				840CA9512F50377300FD30C1 /* HistoryTVC.swift in Sources */,
 				846EFA342F6813550088232B /* FriendsTVC.swift in Sources */,
 				84AFD40B2434486200F1E922 /* OwnTracking.m in Sources */,
 				8411B891189FE9CE0019D2D6 /* Settings.m in Sources */,
