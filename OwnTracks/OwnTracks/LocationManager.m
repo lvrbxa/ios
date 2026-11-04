@@ -17,6 +17,10 @@
 @property (strong, nonatomic) CLLocation *lastUsedLocation;
 @property (strong, nonatomic) CLLocation *lastLocationWithMovement;
 @property (strong, nonatomic) NSTimer *activityTimer;
+// 改造2: minTimeごとに数秒だけBestへ上げて1点取る
+@property (strong, nonatomic) NSTimer *boostTimer;
+@property (strong, nonatomic) NSDate *boostStart;
+@property (strong, nonatomic) CLLocation *boostBest;
 @property (strong, nonatomic) NSMutableSet *pendingRegionEvents;
 - (void)holdDownExpired:(NSTimer *)timer;
 
@@ -48,6 +52,10 @@
 
 #define BACKGROUND_STOP_AFTER 5.0 // seconds
 #define ASSUME_NO_MOTION 0.05 // meters per second (0.05 m/sec is 180 m/hour)
+// 改造1・2の値（設定画面には出さない）
+#define LOW_DISTANCE_FILTER 50.0 // meters
+#define BOOST_ACCURACY 20.0 // meters
+#define BOOST_SECONDS 10.0 // seconds
 
 @implementation PendingRegionEvent
 
@@ -421,8 +429,10 @@ static LocationManager *theInstance = nil;
     
     switch (monitoring) {
         case LocationMonitoringMove:
-            self.manager.distanceFilter = kCLDistanceFilterNone;
-            self.manager.desiredAccuracy = kCLLocationAccuracyBest;
+            // 改造1: 普段は低い精度で動かす
+            [self endBoost];
+            self.manager.distanceFilter = LOW_DISTANCE_FILTER;
+            self.manager.desiredAccuracy = kCLLocationAccuracyHundredMeters;
             [self.activityTimer invalidate];
             
             [self.manager startUpdatingLocation];
@@ -441,6 +451,7 @@ static LocationManager *theInstance = nil;
             
         case LocationMonitoringSignificant:
             [self.activityTimer invalidate];
+            [self endBoost];
             [self.manager stopUpdatingLocation];
             [self.manager startMonitoringSignificantLocationChanges];
             [self.manager startMonitoringVisits];
@@ -450,6 +461,7 @@ static LocationManager *theInstance = nil;
         case LocationMonitoringQuiet:
         default:
             [self.activityTimer invalidate];
+            [self endBoost];
             [self.manager stopUpdatingLocation];
             [self.manager stopMonitoringSignificantLocationChanges];
             [self.manager stopMonitoringVisits];
@@ -480,13 +492,45 @@ static LocationManager *theInstance = nil;
 
 - (void)activityTimer:(NSTimer *)timer {
     OwnTracksLogDebug("[LocationManager] activityTimer fired after %f", self.minTime);
-    CLLocation *location = self.manager.location;
+    // 改造2: Bestへ上げ、精度BOOST_ACCURACY以内の点かBOOST_SECONDS経過で1点採用する
+    if (self.boostStart) return;
+    self.boostStart = [NSDate date];
+    self.boostBest = nil;
+    self.manager.distanceFilter = kCLDistanceFilterNone;
+    self.manager.desiredAccuracy = kCLLocationAccuracyBest;
+    OwnTracksLogDefault("[LocationManager] boost start");
+    self.boostTimer = [NSTimer timerWithTimeInterval:BOOST_SECONDS
+                                              target:self selector:@selector(boostExpired:)
+                                            userInfo:nil
+                                             repeats:NO];
+    [[NSRunLoop currentRunLoop] addTimer:self.boostTimer forMode:NSRunLoopCommonModes];
+}
+
+- (void)boostExpired:(NSTimer *)timer {
+    CLLocation *location = self.boostBest ? self.boostBest : self.manager.location;
+    OwnTracksLogDefault("[LocationManager] boost timeout acc=%.0f",
+                        location ? location.horizontalAccuracy : -1.0);
+    [self finishBoost:location];
+}
+
+- (void)finishBoost:(CLLocation *)location {
+    [self endBoost];
     if (location) {
         self.lastUsedLocation = location;
         [self.delegate timerLocation:location];
     } else {
         OwnTracksLogError("[LocationManager] activityTimer found no location");
     }
+}
+
+// 高精度の取得をやめて低い精度へ戻す（Move以外では精度は使わないので戻すだけ）
+- (void)endBoost {
+    [self.boostTimer invalidate];
+    self.boostTimer = nil;
+    self.boostStart = nil;
+    self.boostBest = nil;
+    self.manager.distanceFilter = LOW_DISTANCE_FILTER;
+    self.manager.desiredAccuracy = kCLLocationAccuracyHundredMeters;
 }
 
 /*
@@ -589,7 +633,20 @@ static LocationManager *theInstance = nil;
         if (location.speed > ASSUME_NO_MOTION) {
             self.lastLocationWithMovement = location;
         }
-        
+
+        // 改造2: 高精度の取得中は、開始後の点のうち最も精度の良い点を覚え、基準に届いたら採用する
+        if (self.boostStart && [location.timestamp timeIntervalSinceDate:self.boostStart] >= 0 &&
+            location.horizontalAccuracy >= 0) {
+            if (!self.boostBest || location.horizontalAccuracy < self.boostBest.horizontalAccuracy) {
+                self.boostBest = location;
+            }
+            if (location.horizontalAccuracy <= BOOST_ACCURACY) {
+                OwnTracksLogDefault("[LocationManager] boost hit acc=%.0f", location.horizontalAccuracy);
+                [self finishBoost:location];
+                continue;
+            }
+        }
+
         if (self.lastUsedLocation &&
             [location.timestamp timeIntervalSinceDate:self.lastUsedLocation.timestamp] <= 0) {
             continue;
