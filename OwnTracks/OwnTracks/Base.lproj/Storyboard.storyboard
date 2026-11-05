@@ -4033,10 +4033,6 @@
         <!--Navigation Controller-->
         <!--Set POI with Image-->
     </scenes>
-    <inferredMetricsTieBreakers>
-        <segue reference="DVT-lO-AyD"/>
-        <segue reference="Hb0-uO-VBI"/>
-    </inferredMetricsTieBreakers>
     <resources>
         <image name="Friends" width="33" height="33"/>
         <image name="Info" width="25" height="25"/>
