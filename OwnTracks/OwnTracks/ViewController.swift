@@ -135,7 +135,9 @@ class ViewController: UIViewController, MKMapViewDelegate, NSFetchedResultsContr
         NSLayoutConstraint.activate([
             web.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             web.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            web.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            // モード切替（modes）を隠さないよう、その下から表示する
+            modes != nil ? web.topAnchor.constraint(equalTo: modes!.bottomAnchor, constant: 6)
+                         : web.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             web.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
         ]);
         webMap = web;
