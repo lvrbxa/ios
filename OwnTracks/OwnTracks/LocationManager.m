@@ -319,9 +319,6 @@ static LocationManager *theInstance = nil;
 
 - (void)sleep {
     OwnTracksLogDebug("[LocationManager] sleep");
-    for (CLBeaconIdentityConstraint *beaconIdentityConstraint in self.manager.rangedBeaconConstraints) {
-        [self.manager stopRangingBeaconsSatisfyingConstraint:beaconIdentityConstraint];
-    }
     if (self.monitoring != LocationMonitoringMove) {
         [self.activityTimer invalidate];
     }
@@ -467,17 +464,7 @@ static LocationManager *theInstance = nil;
 
 - (void)setRanging:(BOOL)ranging {
     OwnTracksLogDefault("[LocationManager] set ranging=%d", ranging);
-    _ranging = ranging;
-    
-    if (!ranging) {
-        for (CLBeaconIdentityConstraint *beaconIdentityConstraint in self.manager.rangedBeaconConstraints) {
-            OwnTracksLogDebug("[LocationManager] stopRangingBeaconsSatisfyingConstraint %{public}@:%{public}@:%{public}@",
-                          beaconIdentityConstraint.UUID.UUIDString,
-                          beaconIdentityConstraint.major,
-                          beaconIdentityConstraint.minor);
-            [self.manager stopRangingBeaconsSatisfyingConstraint:beaconIdentityConstraint];
-        }
-    }
+    _ranging = ranging; // 改造R6: ビーコンの測距は削除（値は保持するだけ）
     for (CLRegion *region in self.manager.monitoredRegions) {
         OwnTracksLogDebug("[LocationManager] requestStateForRegion %{public}@", region.identifier);
         [self.manager requestStateForRegion:region];
@@ -687,43 +674,8 @@ static LocationManager *theInstance = nil;
     if ([region isKindOfClass:[CLBeaconRegion class]]) {
         if (state == CLRegionStateInside) {
             (self.insideBeaconRegions)[region.identifier] = [NSNumber numberWithBool:TRUE];
-            if (self.ranging) {
-                CLBeaconRegion *beaconRegion = (CLBeaconRegion *)region;
-                CLBeaconIdentityConstraint *beaconIdentityConstraint;
-                if (beaconRegion.major && beaconRegion.minor) {
-                    beaconIdentityConstraint =
-                    [[CLBeaconIdentityConstraint alloc] initWithUUID:beaconRegion.UUID
-                                                               major:beaconRegion.major.intValue
-                                                               minor:beaconRegion.minor.intValue];
-                } else if (beaconRegion.major) {
-                    beaconIdentityConstraint =
-                    [[CLBeaconIdentityConstraint alloc] initWithUUID:beaconRegion.UUID
-                                                               major:beaconRegion.major.intValue];
-                } else {
-                    beaconIdentityConstraint =
-                    [[CLBeaconIdentityConstraint alloc] initWithUUID:beaconRegion.UUID];
-                }
-                [self.manager startRangingBeaconsSatisfyingConstraint:beaconIdentityConstraint];
-            }
         } else {
             [self.insideBeaconRegions removeObjectForKey:region.identifier];
-            CLBeaconRegion *beaconRegion = (CLBeaconRegion *)region;
-            CLBeaconIdentityConstraint *beaconIdentityConstraint;
-            if (beaconRegion.major && beaconRegion.minor) {
-                beaconIdentityConstraint =
-                [[CLBeaconIdentityConstraint alloc] initWithUUID:beaconRegion.UUID
-                                                           major:beaconRegion.major.intValue
-                                                           minor:beaconRegion.minor.intValue];
-            } else if (beaconRegion.major) {
-                beaconIdentityConstraint =
-                [[CLBeaconIdentityConstraint alloc] initWithUUID:beaconRegion.UUID
-                                                           major:beaconRegion.major.intValue];
-            } else {
-                beaconIdentityConstraint =
-                [[CLBeaconIdentityConstraint alloc] initWithUUID:beaconRegion.UUID];
-            }
-            [self.manager stopRangingBeaconsSatisfyingConstraint:beaconIdentityConstraint];
-            
         }
     }
     
@@ -794,57 +746,6 @@ static LocationManager *theInstance = nil;
 - (void)locationManager:(CLLocationManager *)manager monitoringDidFailForRegion:(CLRegion *)region withError:(NSError *)error {
     OwnTracksLogError("[LocationManager] monitoringDidFailForRegion %{public}@ %{public}@",
                       region.identifier, error.localizedDescription);
-}
-
-/*
- *
- * Beacons
- *
- */
-- (void)locationManager:(CLLocationManager *)manager
-didFailRangingBeaconsForConstraint:(CLBeaconIdentityConstraint *)beaconConstraint
-                  error:(NSError *)error {
-    OwnTracksLogError("[LocationManager] didFailRangingBeaconsForConstraint %{public}@ %{public}@",
-                 beaconConstraint, error.localizedDescription);
-    
-}
-
-- (void)locationManager:(CLLocationManager *)manager
-        didRangeBeacons:(NSArray<CLBeacon *> *)beacons
-   satisfyingConstraint:(CLBeaconIdentityConstraint *)beaconConstraint {
-    OwnTracksLogDebug("[LocationManager] didRangeBeacons %{public}@ satisfyingContraint %{public}@",
-                 beacons, beaconConstraint);
-    for (CLBeacon *beacon in beacons) {
-        if (beacon.proximity != CLProximityUnknown) {
-            CLBeacon *foundBeacon = nil;
-            for (CLBeacon *rangedBeacon in self.rangedBeacons) {
-                uuid_t rangedBeaconUUID;
-                uuid_t beaconUUID;
-                [rangedBeacon.UUID getUUIDBytes:rangedBeaconUUID];
-                [beacon.UUID getUUIDBytes:beaconUUID];
-                
-                if (uuid_compare(rangedBeaconUUID, beaconUUID) == 0 &&
-                    (rangedBeacon.major).intValue == (beacon.major).intValue &&
-                    (rangedBeacon.minor).intValue == (beacon.minor).intValue) {
-                    foundBeacon = rangedBeacon;
-                    break;
-                }
-            }
-            if (foundBeacon == nil) {
-                [self.delegate beaconInRange:beacon beaconConstraint:beaconConstraint];
-                [self.rangedBeacons addObject:beacon];
-            } else {
-                //if (foundBeacon.proximity != beacon.proximity) {
-                //if (foundBeacon.rssi != beacon.rssi) {
-                if (fabs(foundBeacon.accuracy / beacon.accuracy - 1) > 0.2) {
-                    [self.delegate beaconInRange:beacon beaconConstraint:beaconConstraint];
-                    [self.rangedBeacons removeObject:foundBeacon];
-                    [self.rangedBeacons addObject:beacon];
-                }
-            }
-        }
-    }
-    
 }
 
 /*

@@ -18,7 +18,6 @@
 - (void)visitLocation:(CLLocation * _Nonnull)location;
 - (void)regionEvent:(CLRegion * _Nonnull)region enter:(BOOL)enter;
 - (void)regionState:(CLRegion * _Nonnull)region inside:(BOOL)inside;
-- (void)beaconInRange:(CLBeacon * _Nonnull)beacon beaconConstraint:(CLBeaconIdentityConstraint * _Nonnull)beaconConstraint;
 
 @end
 
