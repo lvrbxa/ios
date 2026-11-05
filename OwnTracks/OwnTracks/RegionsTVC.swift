@@ -165,12 +165,7 @@ class RegionsTVC: OwnTracksEditFetchTVC {
         let vcs = tbc?.viewControllers;
         let nc = vcs?[0];
         if nc != nil && nc is NavigationController {
-            let navigationController = nc as! NavigationController;
-            let vc = navigationController.topViewController;
-            if vc != nil && vc is ViewController {
-                let viewController = vc as! ViewController;
-                viewController.setCenter(annotation: region!);
-            }
+            _ = region; // 改造R4: 地図は無いので中心合わせはしない
             tabBarController?.selectedIndex = 0;
         }
     }
