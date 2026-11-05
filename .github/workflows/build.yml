@@ -16,6 +16,12 @@ jobs:
         run: |
           mkdir Payload
           cp -R build/Build/Products/Release-iphoneos/OwnTracks.app Payload/
+          # Embed entitlements (unsigned builds have none, so SideStore cannot request Wi-Fi info)
+          printf '%s\n' '<?xml version="1.0" encoding="UTF-8"?>' \
+            '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' \
+            '<plist version="1.0"><dict><key>com.apple.developer.networking.wifi-info</key><true/></dict></plist>' > ent.plist
+          codesign -f -s - --entitlements ent.plist Payload/OwnTracks.app
+          codesign -d --entitlements - Payload/OwnTracks.app
           zip -qry OwnTracks.ipa Payload
       - uses: actions/upload-artifact@v4
         with:
