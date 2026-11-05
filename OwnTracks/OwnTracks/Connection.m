@@ -116,6 +116,14 @@
                         // 改造5: 最も古い待ちがBATCH_SECONDSを超えたか、BATCH_MAX件たまったら、配列でまとめて送る
                         BOOL due = matches.count >= BATCH_MAX ||
                             -[queue.timestamp timeIntervalSinceNow] >= BATCH_SECONDS;
+                        // 改造A: Move以外（すぐ止まる）か、出入りが待っていれば待たずに送る
+                        if (!due && [LocationManager sharedInstance].monitoring != LocationMonitoringMove) due = YES;
+                        if (!due) {
+                            NSData *tr = [@"\"_type\":\"transition\"" dataUsingEncoding:NSUTF8StringEncoding];
+                            for (Queue *q in matches) {
+                                if (q.data && [q.data rangeOfData:tr options:0 range:NSMakeRange(0, q.data.length)].location != NSNotFound) { due = YES; break; }
+                            }
+                        }
 
                         if (self.state == state_starting && due) {
                             NSUInteger n = MIN(matches.count, (NSUInteger)BATCH_MAX);

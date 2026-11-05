@@ -814,7 +814,8 @@ performActionForShortcutItem:(UIApplicationShortcutItem *)shortcutItem completio
             
             json[@"lon"] = [NSNumber doubleValueWithSixDecimals:location.coordinate.longitude];
             
-            json[@"tst"] = [NSNumber doubleValueWithZeroDecimals:location.timestamp.timeIntervalSince1970];
+            // 改造B: 出入りの時刻は検知した時刻にする（位置は最後の点のまま）
+            json[@"tst"] = [NSNumber doubleValueWithZeroDecimals:[NSDate date].timeIntervalSince1970];
             
             if (location.horizontalAccuracy >= 0.0) {
                 json[@"acc"] = [NSNumber doubleValueWithZeroDecimals:location.horizontalAccuracy];

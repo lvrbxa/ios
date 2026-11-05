@@ -21,6 +21,8 @@
 @property (strong, nonatomic) NSTimer *boostTimer;
 @property (strong, nonatomic) NSDate *boostStart;
 @property (strong, nonatomic) CLLocation *boostBest;
+// 改造E: モーションセンサーで静止が始まった時刻
+@property (strong, nonatomic) NSDate *stationarySince;
 @property (strong, nonatomic) NSMutableSet *pendingRegionEvents;
 - (void)holdDownExpired:(NSTimer *)timer;
 
@@ -56,6 +58,7 @@
 #define LOW_DISTANCE_FILTER 50.0 // meters
 #define BOOST_ACCURACY 20.0 // meters
 #define BOOST_SECONDS 10.0 // seconds
+#define STATIONARY_SECONDS 300.0 // 改造E: この秒数静止したらSignificantへ
 
 @implementation PendingRegionEvent
 
@@ -287,6 +290,12 @@ static LocationManager *theInstance = nil;
                                                     withHandler:^(CMMotionActivity * _Nullable activity) {
             OwnTracksLogDebug("[LocationManager] activity %{public}@", activity);
             self.motionActivity = activity;
+            // 改造E: 静止の始まりを覚え、動いたら消す
+            if (activity.stationary && activity.confidence != CMMotionActivityConfidenceLow) {
+                if (!self.stationarySince) self.stationarySince = activity.startDate;
+            } else if (!activity.stationary) {
+                self.stationarySince = nil;
+            }
         }];
     }
 }
@@ -429,10 +438,10 @@ static LocationManager *theInstance = nil;
     
     switch (monitoring) {
         case LocationMonitoringMove:
-            // 改造1: 普段は低い精度で動かす
+            // 改造1・C: 普段は基地局程度の精度で動かし、GPSを使わない
             [self endBoost];
             self.manager.distanceFilter = LOW_DISTANCE_FILTER;
-            self.manager.desiredAccuracy = kCLLocationAccuracyHundredMeters;
+            self.manager.desiredAccuracy = kCLLocationAccuracyThreeKilometers;
             [self.activityTimer invalidate];
             
             [self.manager startUpdatingLocation];
@@ -492,6 +501,18 @@ static LocationManager *theInstance = nil;
 
 - (void)activityTimer:(NSTimer *)timer {
     OwnTracksLogDebug("[LocationManager] activityTimer fired after %f", self.minTime);
+    // 改造E: Moveで静止がSTATIONARY_SECONDS続いたらSignificantへ（再開は+followの出→Workerの返事）
+    if (self.monitoring == LocationMonitoringMove && self.stationarySince &&
+        -[self.stationarySince timeIntervalSinceNow] >= STATIONARY_SECONDS) {
+        OwnTracksLogDefault("[LocationManager] stationary %.0fs -> significant",
+                            -[self.stationarySince timeIntervalSinceNow]);
+        self.stationarySince = nil;
+        self.monitoring = LocationMonitoringSignificant;
+        NSManagedObjectContext *moc = CoreData.sharedInstance.mainMOC;
+        [Settings setInt:(int)LocationMonitoringSignificant forKey:@"monitoring_preference" inMOC:moc];
+        [CoreData.sharedInstance sync:moc];
+        return;
+    }
     // 改造2: Bestへ上げ、精度BOOST_ACCURACY以内の点かBOOST_SECONDS経過で1点採用する
     if (self.boostStart) return;
     self.boostStart = [NSDate date];
@@ -530,7 +551,7 @@ static LocationManager *theInstance = nil;
     self.boostStart = nil;
     self.boostBest = nil;
     self.manager.distanceFilter = LOW_DISTANCE_FILTER;
-    self.manager.desiredAccuracy = kCLLocationAccuracyHundredMeters;
+    self.manager.desiredAccuracy = kCLLocationAccuracyThreeKilometers;
 }
 
 /*
