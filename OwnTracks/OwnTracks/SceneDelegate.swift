@@ -25,7 +25,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         if let item = connectionOptions.shortcutItem {
             let ad = UIApplication.shared.delegate as! OwnTracksAppDelegate;
-            _ = ad.performShortcutItem(item);
+            _ = ad.perform(item);
         }
         for urlContext in connectionOptions.urlContexts {
             let ad = UIApplication.shared.delegate as! OwnTracksAppDelegate;
@@ -35,7 +35,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     func windowScene(_ windowScene: UIWindowScene, performActionFor shortcutItem: UIApplicationShortcutItem, completionHandler: @escaping (Bool) -> Void) {
         let ad = UIApplication.shared.delegate as! OwnTracksAppDelegate;
-        completionHandler(ad.performShortcutItem(shortcutItem));
+        completionHandler(ad.perform(shortcutItem));
     }
 
     func sceneWillEnterForeground(_ scene: UIScene) {
