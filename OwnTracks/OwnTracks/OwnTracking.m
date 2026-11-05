@@ -539,13 +539,13 @@ static OwnTracking *theInstance = nil;
     region.lat = @(lat);
     region.lon = @(lon);
     [[CoreData sharedInstance] sync:region.managedObjectContext];
-    [[LocationManager sharedInstance] startRegion:region.CLregion];
+    [[LocationManager sharedInstance] startRegion:region.otRegion];
     return region;
 }
 
 - (void)removeRegion:(Region *)region context:(NSManagedObjectContext *)context {
     OwnTracksLogDebug("[OwnTracking] removeRegion %@", region.name);
-    [[LocationManager sharedInstance] stopRegion:region.CLregion];
+    [[LocationManager sharedInstance] stopRegion:region.otRegion];
     [context deleteObject:region];
     [[CoreData sharedInstance] sync:context];
 }

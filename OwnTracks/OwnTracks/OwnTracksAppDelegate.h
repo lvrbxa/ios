@@ -52,5 +52,8 @@
 - (void)syncProcessing;
 
 - (BOOL)openURL:(nullable NSURL *)url;
+- (void)appDidBecomeActive;
+- (void)appWillResignActive;
+- (BOOL)performShortcutItem:(nonnull UIApplicationShortcutItem *)shortcutItem;
 
 @end

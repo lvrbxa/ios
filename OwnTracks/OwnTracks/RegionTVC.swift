@@ -23,7 +23,7 @@ class RegionTVC: UITableViewController, UITextFieldDelegate {
     @IBOutlet weak var UIradius: UITextField!
     
     var needsUpdate: Bool = false;
-    var oldRegion: CLRegion?;
+    var oldRegion: OTRegion?;
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated);
@@ -38,7 +38,7 @@ class RegionTVC: UITableViewController, UITextFieldDelegate {
         
         title = region?.name;
         setup();
-        oldRegion = region?.cLregion;
+        oldRegion = region?.otRegion;
     }
     
     override func viewWillDisappear(_ animated: Bool) {
@@ -58,8 +58,8 @@ class RegionTVC: UITableViewController, UITextFieldDelegate {
                 if oldRegion != nil {
                     lm.stop(oldRegion!);
                 }
-                if region!.cLregion != nil {
-                    lm.start(region!.cLregion!);
+                if region!.otRegion != nil {
+                    lm.start(region!.otRegion!);
                 }
                 CoreData.sharedInstance().sync(region!.managedObjectContext!);
             }
@@ -132,8 +132,7 @@ class RegionTVC: UITableViewController, UITextFieldDelegate {
     @IBAction func navigatePressed(_ sender: UIButton) {
         if region != nil {
             let coord = CLLocationCoordinate2DMake(region!.lat?.doubleValue ?? 0.0, region!.lon?.doubleValue ?? 0.0);
-            let place = MKPlacemark(coordinate: coord);
-            let destination = MKMapItem(placemark: place);
+            let destination = MKMapItem(location: CLLocation(latitude: coord.latitude, longitude: coord.longitude), address: nil);
             destination.name = region!.name;
             MKMapItem.openMaps(with: [destination], launchOptions: [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving]);
         }

@@ -13,14 +13,31 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     func sceneDidBecomeActive(_ scene: UIScene) {
         let ad = UIApplication.shared.delegate as! OwnTracksAppDelegate;
-        ad.applicationDidBecomeActive(UIApplication.shared);
+        ad.appDidBecomeActive();
     }
     
     func sceneWillResignActive(_ scene: UIScene) {
         let ad = UIApplication.shared.delegate as! OwnTracksAppDelegate;
-        ad.applicationWillResignActive(UIApplication.shared);
+        ad.appWillResignActive();
     }
     
+    // 改造mod9: ホーム画面のショートカット（UIApplicationDelegate側はiOS 26で非推奨）
+    func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
+        if let item = connectionOptions.shortcutItem {
+            let ad = UIApplication.shared.delegate as! OwnTracksAppDelegate;
+            _ = ad.performShortcutItem(item);
+        }
+        for urlContext in connectionOptions.urlContexts {
+            let ad = UIApplication.shared.delegate as! OwnTracksAppDelegate;
+            ad.open(urlContext.url);
+        }
+    }
+
+    func windowScene(_ windowScene: UIWindowScene, performActionFor shortcutItem: UIApplicationShortcutItem, completionHandler: @escaping (Bool) -> Void) {
+        let ad = UIApplication.shared.delegate as! OwnTracksAppDelegate;
+        completionHandler(ad.performShortcutItem(shortcutItem));
+    }
+
     func sceneWillEnterForeground(_ scene: UIScene) {
     }
     

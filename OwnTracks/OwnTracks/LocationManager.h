@@ -11,13 +11,24 @@
 #import <CoreLocation/CoreLocation.h>
 #import <CoreMotion/CoreMotion.h>
 
+// 改造mod9: 範囲は自前の型で持つ（CLRegion系はiOS 27.3で非推奨。監視はCLMonitor）
+@interface OTRegion : NSObject
+@property (copy, nonatomic) NSString * _Nonnull identifier;
+@property (nonatomic) CLLocationCoordinate2D center;
+@property (nonatomic) CLLocationDistance radius;
+@property (readonly, nonatomic) BOOL isFollow;
++ (OTRegion * _Nonnull)regionWithIdentifier:(NSString * _Nonnull)identifier
+                                     center:(CLLocationCoordinate2D)center
+                                     radius:(CLLocationDistance)radius;
+@end
+
 @protocol LocationManagerDelegate <NSObject>
 
 - (void)newLocation:(CLLocation * _Nonnull)location;
 - (void)timerLocation:(CLLocation * _Nonnull)location;
 - (void)visitLocation:(CLLocation * _Nonnull)location;
-- (void)regionEvent:(CLRegion * _Nonnull)region enter:(BOOL)enter;
-- (void)regionState:(CLRegion * _Nonnull)region inside:(BOOL)inside;
+- (void)regionEvent:(OTRegion * _Nonnull)region enter:(BOOL)enter;
+- (void)regionState:(OTRegion * _Nonnull)region inside:(BOOL)inside;
 
 @end
 
@@ -43,6 +54,8 @@ typedef NS_ENUM(NSInteger, LocationMonitoring) {
 @property (readonly, nonatomic) CLLocation * _Nonnull location;
 @property (readonly, nonatomic) CLLocation * _Nonnull lastUsedLocation;
 @property (readonly, nonatomic) CLLocation * _Nonnull lastLocationWithMovement;
+// 改造mod9・案1: 改造Eで静止と判断してSignificantにした後、Moveになるまで真
+@property (readonly, nonatomic) BOOL stationaryArmed;
 
 @property (readonly, nonatomic) CLAuthorizationStatus locationManagerAuthorizationStatus;
 
@@ -61,16 +74,13 @@ typedef NS_ENUM(NSInteger, LocationMonitoring) {
 - (void)sleep;
 - (void)stop;
 
-- (void)startRegion:(CLRegion * _Nonnull)region;
-- (void)stopRegion:(CLRegion *_Nonnull)region;
+- (void)startRegion:(OTRegion * _Nonnull)region NS_SWIFT_NAME(start(_:));
+- (void)stopRegion:(OTRegion *_Nonnull)region NS_SWIFT_NAME(stop(_:));
 - (void)resetRegions;
 - (BOOL)monitoredRegion:(NSString *_Nonnull)identifier;
 
-@property (NS_NONATOMIC_IOSONLY, readonly) BOOL insideBeaconRegion;
-- (BOOL)insideBeaconRegion:(NSString * _Nonnull)identifier;
 @property (NS_NONATOMIC_IOSONLY, readonly) BOOL insideCircularRegion;
 - (BOOL)insideCircularRegion:(NSString * _Nonnull)identifier;
-@property (readonly, strong, nonatomic) NSMutableDictionary * _Nonnull insideBeaconRegions;
 @property (readonly, strong, nonatomic) NSMutableDictionary * _Nonnull insideCircularRegions;
 
 @end

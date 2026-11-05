@@ -744,7 +744,7 @@ static SettingsDefaults *defaults;
                 if (minor != region.minor.unsignedIntValue) {
                     equal = FALSE;
                 }
-                CLRegion *clRegion = region.CLregion;
+                OTRegion *clRegion = region.otRegion;
                 if (!clRegion || !clRegion.isFollow) {
                     if (latDegrees != region.lat.doubleValue) {
                         equal = FALSE;

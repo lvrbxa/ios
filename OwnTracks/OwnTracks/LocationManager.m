@@ -24,11 +24,17 @@
 // 改造E: モーションセンサーで静止が始まった時刻
 @property (strong, nonatomic) NSDate *stationarySince;
 @property (strong, nonatomic) NSMutableSet *pendingRegionEvents;
+// 改造mod9: CLMonitor（起動のたびに同じ名前で作る。準備ができるまでの操作は積んでおく）
+@property (strong, nonatomic) CLMonitor *monitor;
+@property (strong, nonatomic) NSMutableArray *pendingMonitorOps;
+@property (strong, nonatomic) NSMutableDictionary<NSString *, OTRegion *> *regions;
+@property (strong, nonatomic) NSMutableDictionary<NSString *, NSNumber *> *knownStates;
+@property (strong, nonatomic) NSMutableSet<NSString *> *initialPending;
+@property (strong, nonatomic) CLLocation *lastBoostLocation;
+@property (nonatomic) BOOL stationaryArmed;
 - (void)holdDownExpired:(NSTimer *)timer;
 
-@property (strong, nonatomic) NSMutableDictionary *insideBeaconRegions;
 @property (strong, nonatomic) NSMutableDictionary *insideCircularRegions;
-@property (strong, nonatomic) NSMutableArray *rangedBeacons;
 @property (strong, nonatomic) NSTimer *backgroundTimer;
 @property (strong, nonatomic) NSUserDefaults *sharedUserDefaults;
 
@@ -47,7 +53,7 @@
 @end
 
 @interface PendingRegionEvent : NSObject
-@property (strong, nonatomic) CLRegion *region;
+@property (strong, nonatomic) OTRegion *region;
 @property (strong, nonatomic) NSTimer *holdDownTimer;
 
 @end
@@ -59,10 +65,31 @@
 #define BOOST_ACCURACY 20.0 // meters
 #define BOOST_SECONDS 10.0 // seconds
 #define STATIONARY_SECONDS 300.0 // 改造E: この秒数静止したらSignificantへ
+#define STATIONARY_RADIUS 100.0 // 改造mod9・案1: 静止したときに置く+followの半径
+#define STATIONARY_MAX_ACC 100.0 // 改造mod9・案1: 静止の範囲の中心に使える点の精度の上限
+#define MONITOR_NAME @"ot" // 改造mod9: CLMonitorの名前
+
+@implementation OTRegion
+
++ (OTRegion *)regionWithIdentifier:(NSString *)identifier
+                            center:(CLLocationCoordinate2D)center
+                            radius:(CLLocationDistance)radius {
+    OTRegion *r = [[OTRegion alloc] init];
+    r.identifier = identifier;
+    r.center = center;
+    r.radius = radius;
+    return r;
+}
+
+- (BOOL)isFollow {
+    return [self.identifier hasPrefix:@"+"];
+}
+
+@end
 
 @implementation PendingRegionEvent
 
-+ (PendingRegionEvent *)holdDown:(CLRegion *)region
++ (PendingRegionEvent *)holdDown:(OTRegion *)region
 for:(NSTimeInterval)interval
 to:(id)to {
     PendingRegionEvent *p = [[PendingRegionEvent alloc] init];
@@ -97,9 +124,11 @@ static LocationManager *theInstance = nil;
     self.altimeter = [[CMAltimeter alloc] init];
     self.motionActivityManager = [[CMMotionActivityManager alloc] init];
     
-    self.insideBeaconRegions = [[NSMutableDictionary alloc] init];
     self.insideCircularRegions = [[NSMutableDictionary alloc] init];
-    self.rangedBeacons = [[NSMutableArray alloc] init];
+    self.pendingMonitorOps = [[NSMutableArray alloc] init];
+    self.regions = [[NSMutableDictionary alloc] init];
+    self.knownStates = [[NSMutableDictionary alloc] init];
+    self.initialPending = [[NSMutableSet alloc] init];
     self.lastUsedLocation = [[CLLocation alloc] initWithLatitude:0 longitude:0];
     self.lastLocationWithMovement = [[CLLocation alloc] initWithCoordinate:CLLocationCoordinate2DMake(0.0, 0.0)
                                                                   altitude:(0.0)
@@ -107,6 +136,7 @@ static LocationManager *theInstance = nil;
                                                           verticalAccuracy:-1.0
                                                                  timestamp:[NSDate date]];
     self.pendingRegionEvents = [[NSMutableSet alloc] init];
+    [self setupMonitor];
     
     [self authorize];
     
@@ -298,10 +328,7 @@ static LocationManager *theInstance = nil;
         [[NSRunLoop currentRunLoop] addTimer:self.activityTimer
                                      forMode:NSRunLoopCommonModes];
     }
-    for (CLRegion *region in self.manager.monitoredRegions) {
-        OwnTracksLogDebug("[LocationManager] requestStateForRegion %{public}@", region.identifier);
-        [self.manager requestStateForRegion:region];
-    }
+    [self refreshRegionStates];
     if (self.monitoring == LocationMonitoringSignificant) {
         [self.manager requestLocation];
     }
@@ -338,43 +365,262 @@ static LocationManager *theInstance = nil;
     }
 }
 
-- (void)startRegion:(CLRegion *)region {
-    if (region) {
-        [self.manager startMonitoringForRegion:region];
+/*
+ *
+ * 改造mod9: CLMonitorによる範囲の監視
+ *
+ */
+- (void)setupMonitor {
+    __weak LocationManager *weakSelf = self;
+    CLMonitorConfiguration *config =
+    [CLMonitorConfiguration configWithMonitorName:MONITOR_NAME
+                                            queue:dispatch_get_main_queue()
+                                     eventHandler:^(CLMonitor *monitor, CLMonitoringEvent *event) {
+        [weakSelf monitor:monitor event:event];
+    }];
+    [CLMonitor requestMonitorWithConfiguration:config completion:^(CLMonitor *monitor) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [weakSelf monitorReady:monitor];
+        });
+    }];
+}
+
+- (void)monitorReady:(CLMonitor *)monitor {
+    self.monitor = monitor;
+    OwnTracksLogDefault("[LocationManager] monitor ready %lu",
+                        (unsigned long)monitor.monitoredIdentifiers.count);
+    // 保存済みの条件から範囲と状態を戻す（起動直後のinregionsを空にしない）
+    for (NSString *identifier in monitor.monitoredIdentifiers) {
+        [self regionForIdentifier:identifier monitor:monitor];
+    }
+    [self refreshRegionStates];
+    [self migrateLegacyRegions];
+    NSArray *ops = [self.pendingMonitorOps copy];
+    [self.pendingMonitorOps removeAllObjects];
+    for (void (^op)(CLMonitor *) in ops) {
+        op(monitor);
     }
 }
 
-- (void)stopRegion:(CLRegion *)region {
-    if (region) {
-        [self removeHoldDown:region];
-        [self.manager stopMonitoringForRegion:region];
-        [self.insideBeaconRegions removeObjectForKey:region.identifier];
+- (OTRegion *)regionForIdentifier:(NSString *)identifier monitor:(CLMonitor *)monitor {
+    OTRegion *region = self.regions[identifier];
+    if (!region) {
+        CLMonitoringRecord *record = [monitor monitoringRecordForIdentifier:identifier];
+        if ([record.condition isKindOfClass:[CLCircularGeographicCondition class]]) {
+            CLCircularGeographicCondition *c = (CLCircularGeographicCondition *)record.condition;
+            region = [OTRegion regionWithIdentifier:identifier center:c.center radius:c.radius];
+            self.regions[identifier] = region;
+        }
+    }
+    return region;
+}
+
+- (void)withMonitor:(void (^)(CLMonitor *monitor))op {
+    if (self.monitor) {
+        op(self.monitor);
+    } else {
+        [self.pendingMonitorOps addObject:[op copy]];
+    }
+}
+
+// 旧API（CLLocationManagerのリージョン監視）で登録済みの範囲を、1回だけCLMonitorへ移す
+- (void)migrateLegacyRegions {
+    NSString *key = @"mod9MigratedLegacyRegions";
+    if ([[NSUserDefaults standardUserDefaults] boolForKey:key]) {
+        return;
+    }
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    for (CLRegion *legacy in self.manager.monitoredRegions) {
+        if ([legacy isKindOfClass:[CLCircularRegion class]]) {
+            CLCircularRegion *c = (CLCircularRegion *)legacy;
+            if (!self.regions[c.identifier]) {
+                OwnTracksLogDefault("[LocationManager] migrate %{public}@", c.identifier);
+                [self startRegion:[OTRegion regionWithIdentifier:c.identifier
+                                                          center:c.center
+                                                          radius:c.radius]];
+            }
+        }
+        [self.manager stopMonitoringForRegion:legacy];
+    }
+#pragma clang diagnostic pop
+    [[NSUserDefaults standardUserDefaults] setBool:TRUE forKey:key];
+}
+
+- (void)setKnownState:(OTRegion *)region inside:(BOOL)inside {
+    self.knownStates[region.identifier] = @(inside);
+    if (inside) {
+        self.insideCircularRegions[region.identifier] = [NSNumber numberWithBool:TRUE];
+    } else {
         [self.insideCircularRegions removeObjectForKey:region.identifier];
     }
+    [self.delegate regionState:region inside:inside];
+}
+
+// 記録済みの最後の状態を読むだけ（出入りのイベントにはしない）
+- (void)refreshRegionStates {
+    if (!self.monitor) {
+        return;
+    }
+    for (NSString *identifier in self.monitor.monitoredIdentifiers) {
+        OTRegion *region = [self regionForIdentifier:identifier monitor:self.monitor];
+        CLMonitoringEvent *last = [self.monitor monitoringRecordForIdentifier:identifier].lastEvent;
+        if (region && last &&
+            (last.state == CLMonitoringStateSatisfied || last.state == CLMonitoringStateUnsatisfied)) {
+            [self setKnownState:region inside:(last.state == CLMonitoringStateSatisfied)];
+        }
+    }
+}
+
+- (void)monitor:(CLMonitor *)monitor event:(CLMonitoringEvent *)event {
+    NSString *identifier = event.identifier;
+    OwnTracksLogDefault("[LocationManager] monitor event %{public}@ state=%ld",
+                        identifier, (long)event.state);
+    if (event.authorizationDenied || event.authorizationDeniedGlobally ||
+        event.authorizationRestricted || event.insufficientlyInUse ||
+        event.serviceSessionRequired || event.conditionLimitExceeded ||
+        event.conditionUnsupported || event.persistenceUnavailable || event.accuracyLimited) {
+        OwnTracksLogError("[LocationManager] monitor problem %{public}@ denied=%d global=%d restricted=%d inUse=%d session=%d limit=%d unsupported=%d persist=%d accuracy=%d",
+                          identifier, event.authorizationDenied, event.authorizationDeniedGlobally,
+                          event.authorizationRestricted, event.insufficientlyInUse,
+                          event.serviceSessionRequired, event.conditionLimitExceeded,
+                          event.conditionUnsupported, event.persistenceUnavailable, event.accuracyLimited);
+    }
+
+    OTRegion *region = [self regionForIdentifier:identifier monitor:monitor];
+    if (!region) {
+        return;
+    }
+
+    if (event.state == CLMonitoringStateUnmonitored) {
+        // 黙って監視が外れることがある（Customer.io SDKの知見）。置き直す
+        OwnTracksLogError("[LocationManager] unmonitored %{public}@ -> re-add", identifier);
+        [self startRegion:region];
+        return;
+    }
+    if (event.state != CLMonitoringStateSatisfied && event.state != CLMonitoringStateUnsatisfied) {
+        return;
+    }
+    BOOL inside = (event.state == CLMonitoringStateSatisfied);
+
+    // 置いた直後の最初の判定は状態だけ（旧APIのdidDetermineStateと同じ扱い）
+    if ([self.initialPending containsObject:identifier]) {
+        [self.initialPending removeObject:identifier];
+        [self setKnownState:region inside:inside];
+        return;
+    }
+
+    // 変化が無ければイベントにしない。未知なら記録の前回の状態（処理中のイベントの1つ前）と比べる
+    NSNumber *previous = self.knownStates[identifier];
+    if (!previous) {
+        CLMonitoringEvent *last = [monitor monitoringRecordForIdentifier:identifier].lastEvent;
+        if (last && (last.state == CLMonitoringStateSatisfied || last.state == CLMonitoringStateUnsatisfied)) {
+            previous = @(last.state == CLMonitoringStateSatisfied);
+        }
+    }
+    if (previous && previous.boolValue == inside) {
+        return;
+    }
+
+    if (inside) {
+        if (![self removeHoldDown:region]) {
+            OwnTracksLogDefault("[LocationManager] enter %{public}@", identifier);
+            [self setKnownState:region inside:TRUE];
+            [self.delegate regionEvent:region enter:YES];
+        } else {
+            self.knownStates[identifier] = @(TRUE);
+        }
+    } else {
+        if ([identifier hasPrefix:@"-"]) {
+            [self removeHoldDown:region];
+            self.knownStates[identifier] = @(FALSE);
+            [self.pendingRegionEvents addObject:[PendingRegionEvent holdDown:region for:3.0 to:self]];
+        } else {
+            OwnTracksLogDefault("[LocationManager] exit %{public}@", identifier);
+            [self setKnownState:region inside:FALSE];
+            [self.delegate regionEvent:region enter:NO];
+        }
+    }
+}
+
+- (void)startRegion:(OTRegion *)region {
+    if (!region || region.radius <= 0) {
+        return;
+    }
+    self.regions[region.identifier] = region;
+    CLCircularGeographicCondition *condition =
+    [[CLCircularGeographicCondition alloc] initWithCenter:region.center radius:region.radius];
+    NSString *identifier = region.identifier;
+    if (region.isFollow) {
+        // 今いる場所に置くので中にいる前提。出たときだけイベントが来る
+        [self.initialPending removeObject:identifier];
+        self.knownStates[identifier] = @(TRUE);
+        self.insideCircularRegions[identifier] = [NSNumber numberWithBool:TRUE];
+        [self withMonitor:^(CLMonitor *monitor) {
+            [monitor addConditionForMonitoring:condition
+                                    identifier:identifier
+                                  assumedState:CLMonitoringStateSatisfied];
+        }];
+    } else {
+        [self.initialPending addObject:identifier];
+        [self withMonitor:^(CLMonitor *monitor) {
+            [monitor addConditionForMonitoring:condition identifier:identifier];
+        }];
+    }
+}
+
+- (void)stopRegion:(OTRegion *)region {
+    if (region) {
+        [self stopIdentifier:region.identifier];
+    }
+}
+
+- (void)stopIdentifier:(NSString *)identifier {
+    OTRegion *region = self.regions[identifier];
+    if (region) {
+        [self removeHoldDown:region];
+    }
+    [self.regions removeObjectForKey:identifier];
+    [self.knownStates removeObjectForKey:identifier];
+    [self.initialPending removeObject:identifier];
+    [self.insideCircularRegions removeObjectForKey:identifier];
+    [self withMonitor:^(CLMonitor *monitor) {
+        [monitor removeConditionFromMonitoringWithIdentifier:identifier];
+    }];
 }
 
 - (void)resetRegions {
-    for (CLRegion *region in self.manager.monitoredRegions) {
-        [self stopRegion:region];
+    for (NSString *identifier in [self.regions.allKeys copy]) {
+        [self stopIdentifier:identifier];
+    }
+    [self withMonitor:^(CLMonitor *monitor) {
+        for (NSString *identifier in [monitor.monitoredIdentifiers copy]) {
+            [monitor removeConditionFromMonitoringWithIdentifier:identifier];
+        }
+    }];
+}
+
+// 改造mod9・案1: 静止した点（精度の良いboostの点）を中心に+followを小さく置き直す
+- (void)armStationaryFollow {
+    CLLocation *center = self.lastBoostLocation;
+    if (!center || center.horizontalAccuracy < 0 || center.horizontalAccuracy > STATIONARY_MAX_ACC) {
+        OwnTracksLogDefault("[LocationManager] stationary follow skipped (no precise point)");
+        return;
+    }
+    for (OTRegion *region in [self.regions.allValues copy]) {
+        if (region.isFollow) {
+            OTRegion *r = [OTRegion regionWithIdentifier:region.identifier
+                                                  center:center.coordinate
+                                                  radius:MAX(STATIONARY_RADIUS, center.horizontalAccuracy)];
+            OwnTracksLogDefault("[LocationManager] stationary follow %{public}@ r=%.0f",
+                                r.identifier, r.radius);
+            [self startRegion:r];
+        }
     }
 }
 
 - (BOOL)monitoredRegion:(NSString *)identifier {
-    for (CLRegion *region in self.manager.monitoredRegions) {
-        if ([identifier isEqualToString:region.identifier]) {
-            return true;
-        }
-    }
-    return false;
-}
-
-- (BOOL)insideBeaconRegion {
-    return (self.insideBeaconRegions.count != 0);
-}
-
-- (BOOL)insideBeaconRegion:(NSString *)identifier {
-    NSNumber *number = (self.insideBeaconRegions)[identifier];
-    return (number ? number.boolValue : false);
+    return (self.regions[identifier] != nil);
 }
 
 - (BOOL)insideCircularRegion {
@@ -415,6 +661,7 @@ static LocationManager *theInstance = nil;
         OwnTracksLogDefault("[LocationManager] monitoring set to %ld", (long)monitoring);
     }
     _monitoring = monitoring;
+    self.stationaryArmed = FALSE; // 改造mod9・案1: 改造Eだけが切替の直後に真にする
     self.manager.pausesLocationUpdatesAutomatically = NO;
     self.manager.allowsBackgroundLocationUpdates = TRUE;
     
@@ -465,10 +712,7 @@ static LocationManager *theInstance = nil;
 - (void)setRanging:(BOOL)ranging {
     OwnTracksLogDefault("[LocationManager] set ranging=%d", ranging);
     _ranging = ranging; // 改造R6: ビーコンの測距は削除（値は保持するだけ）
-    for (CLRegion *region in self.manager.monitoredRegions) {
-        OwnTracksLogDebug("[LocationManager] requestStateForRegion %{public}@", region.identifier);
-        [self.manager requestStateForRegion:region];
-    }
+    [self refreshRegionStates];
 }
 
 - (void)activityTimer:(NSTimer *)timer {
@@ -479,7 +723,9 @@ static LocationManager *theInstance = nil;
         OwnTracksLogDefault("[LocationManager] stationary %.0fs -> significant",
                             -[self.stationarySince timeIntervalSinceNow]);
         self.stationarySince = nil;
+        [self armStationaryFollow];
         self.monitoring = LocationMonitoringSignificant;
+        self.stationaryArmed = TRUE;
         NSManagedObjectContext *moc = CoreData.sharedInstance.mainMOC;
         [Settings setInt:(int)LocationMonitoringSignificant forKey:@"monitoring_preference" inMOC:moc];
         [CoreData.sharedInstance sync:moc];
@@ -509,6 +755,9 @@ static LocationManager *theInstance = nil;
 - (void)finishBoost:(CLLocation *)location {
     [self endBoost];
     if (location) {
+        if (location.horizontalAccuracy >= 0 && location.horizontalAccuracy <= STATIONARY_MAX_ACC) {
+            self.lastBoostLocation = location;
+        }
         self.lastUsedLocation = location;
         [self.delegate timerLocation:location];
     } else {
@@ -663,61 +912,15 @@ static LocationManager *theInstance = nil;
 
 /*
  *
- * Regions
+ * Regions（改造mod9: イベントはCLMonitorから。ここは出るときの3秒の待ちだけ）
  *
  */
-- (void)locationManager:(CLLocationManager *)manager
-      didDetermineState:(CLRegionState)state
-              forRegion:(CLRegion *)region {
-    OwnTracksLogDebug("[LocationManager] didDetermineState %ld %{public}@", (long)state, region.identifier);
-    
-    if ([region isKindOfClass:[CLBeaconRegion class]]) {
-        if (state == CLRegionStateInside) {
-            (self.insideBeaconRegions)[region.identifier] = [NSNumber numberWithBool:TRUE];
-        } else {
-            [self.insideBeaconRegions removeObjectForKey:region.identifier];
-        }
-    }
-    
-    if ([region isKindOfClass:[CLCircularRegion class]]) {
-        if (state == CLRegionStateInside) {
-            (self.insideCircularRegions)[region.identifier] = [NSNumber numberWithBool:TRUE];
-        } else {
-            [self.insideCircularRegions removeObjectForKey:region.identifier];
-        }
-    }
-    [self.delegate regionState:region inside:(state == CLRegionStateInside)];
-}
-
-- (void)locationManager:(CLLocationManager *)manager
-         didEnterRegion:(CLRegion *)region {
-    OwnTracksLogDefault("[LocationManager] didEnterRegion %{public}@", region.identifier);
-    
-    if (![self removeHoldDown:region]) {
-        [self locationManager:manager didDetermineState:CLRegionStateInside forRegion:region];
-        [self.delegate regionEvent:region enter:YES];
-    }
-}
-
-- (void)locationManager:(CLLocationManager *)manager
-          didExitRegion:(CLRegion *)region {
-    OwnTracksLogDefault("[LocationManager] didExitRegion %{public}@", region.identifier);
-    
-    if ([region.identifier hasPrefix:@"-"]) {
-        [self removeHoldDown:region];
-        [self.pendingRegionEvents addObject:[PendingRegionEvent holdDown:region for:3.0 to:self]];
-    } else {
-        [self locationManager:manager didDetermineState:CLRegionStateOutside forRegion:region];
-        [self.delegate regionEvent:region enter:NO];
-    }
-}
-
-- (BOOL)removeHoldDown:(CLRegion *)region {
+- (BOOL)removeHoldDown:(OTRegion *)region {
     OwnTracksLogDebug("[LocationManager] removeHoldDown %@ [%lu]",
                       region.identifier, (unsigned long)self.pendingRegionEvents.count);
-    
-    for (PendingRegionEvent *p in self.pendingRegionEvents) {
-        if (p.region == region) {
+
+    for (PendingRegionEvent *p in [self.pendingRegionEvents copy]) {
+        if ([p.region.identifier isEqualToString:region.identifier]) {
             OwnTracksLogDebug("[LocationManager] holdDownInvalidated %{public}@", region.identifier);
             [p.holdDownTimer invalidate];
             p.region = nil;
@@ -732,20 +935,14 @@ static LocationManager *theInstance = nil;
     OwnTracksLogDebug("[LocationManager] holdDownExpired %{public}@", timer.userInfo);
     if ([timer.userInfo isKindOfClass:[PendingRegionEvent class]]) {
         PendingRegionEvent *p = (PendingRegionEvent *)timer.userInfo;
-        OwnTracksLogDebug("[LocationManager] holdDownExpired %{public}@", p.region.identifier);
-        [self.delegate regionEvent:p.region enter:NO];
-        [self removeHoldDown:p.region];
+        OTRegion *region = p.region;
+        if (region) {
+            OwnTracksLogDebug("[LocationManager] holdDownExpired %{public}@", region.identifier);
+            [self removeHoldDown:region];
+            [self setKnownState:region inside:FALSE];
+            [self.delegate regionEvent:region enter:NO];
+        }
     }
-}
-
-- (void)locationManager:(CLLocationManager *)manager didStartMonitoringForRegion:(CLRegion *)region {
-    OwnTracksLogDebug("[LocationManager] didStartMonitoringForRegion %{public}@", region.identifier);
-    [self.manager requestStateForRegion:region];
-}
-
-- (void)locationManager:(CLLocationManager *)manager monitoringDidFailForRegion:(CLRegion *)region withError:(NSError *)error {
-    OwnTracksLogError("[LocationManager] monitoringDidFailForRegion %{public}@ %{public}@",
-                      region.identifier, error.localizedDescription);
 }
 
 /*

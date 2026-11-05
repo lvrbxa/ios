@@ -18,19 +18,17 @@
 
 - (void)getReverseGeoCode {
     if (!self.placemark) {
-        CLGeocoder *geocoder = [[CLGeocoder alloc] init];
+        // 改造mod9: CLGeocoderはiOS 26で非推奨。MapKitの逆ジオコーディングを使う
         CLLocation *location = [[CLLocation alloc] initWithLatitude:(self.lat).doubleValue
                                                           longitude:(self.lon).doubleValue];
-        [geocoder reverseGeocodeLocation:location completionHandler:
-         ^(NSArray *placemarks, NSError *error) {
+        MKReverseGeocodingRequest *request = [[MKReverseGeocodingRequest alloc] initWithLocation:location];
+        [request getMapItemsWithCompletionHandler:
+         ^(NSArray<MKMapItem *> *mapItems, NSError *error) {
              [self.managedObjectContext performBlock:^{
                  if (!self.isDeleted) {
-                     if (placemarks.count > 0) {
-                         CLPlacemark *placemark = placemarks[0];
-                         CNPostalAddress *postalAddress = placemark.postalAddress;
-                         self.placemark = [CNPostalAddressFormatter
-                                           stringFromPostalAddress:postalAddress
-                                           style:CNPostalAddressFormatterStyleMailingAddress];
+                     NSString *full = mapItems.firstObject.address.fullAddress;
+                     if (full.length > 0) {
+                         self.placemark = full;
                      } else {
                          self.placemark = [NSString stringWithFormat:@"%@\n%@ %ld\n%@",
                                            NSLocalizedString(@"Address resolver failed", @"reverseGeocodeLocation error"),

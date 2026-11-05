@@ -112,23 +112,13 @@ class RegionsTVC: OwnTracksEditFetchTVC {
             cell.textLabel?.text = region!.name;
             cell.detailTextLabel?.text = region!.subtitle;
             
-            let clRegion = region!.cLregion;
+            let clRegion = region!.otRegion;
             if clRegion != nil {
                 if LocationManager.sharedInstance().monitoredRegion(clRegion!.identifier) {
-                    if clRegion!.isKind(of: CLCircularRegion.self) {
-                        if LocationManager.sharedInstance().insideCircularRegion(clRegion!.identifier) {
-                            cell.imageView?.image = UIImage(named: "RegionHot");
-                        } else {
-                            cell.imageView?.image = UIImage(named: "RegionCold");
-                        }
-                    } else if clRegion!.isKind(of: CLBeaconRegion.self) {
-                        if LocationManager.sharedInstance().insideBeaconRegion(clRegion!.identifier) {
-                            cell.imageView?.image = UIImage(named: "iBeaconHot");
-                        } else {
-                            cell.imageView?.image = UIImage(named: "iBeaconCold");
-                        }
+                    if LocationManager.sharedInstance().insideCircularRegion(clRegion!.identifier) {
+                        cell.imageView?.image = UIImage(named: "RegionHot");
                     } else {
-                        cell.imageView?.image = UIImage(systemName: "exclamationmark.triangle");
+                        cell.imageView?.image = UIImage(named: "RegionCold");
                     }
                 } else {
                     cell.imageView?.image = UIImage(systemName: "exclamationmark.triangle")

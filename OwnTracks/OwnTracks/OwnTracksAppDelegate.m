@@ -178,12 +178,14 @@
     NSError *error;
     BGAppRefreshTaskRequest *bgAppRefreshTaskRequest =
     [[BGAppRefreshTaskRequest alloc] initWithIdentifier:TASK_IDENTIFIER];
-    BOOL success = [[BGTaskScheduler sharedScheduler] submitTaskRequest:bgAppRefreshTaskRequest error:&error];
-    OwnTracksLogDebug("[OwnTracksAppDelegate] submitTaskRequest %@ @ %@ %d, %@",
-                 bgAppRefreshTaskRequest.identifier,
-                 bgAppRefreshTaskRequest.earliestBeginDate,
-                 success,
-                 error);
+    // 改造mod9: submitTaskRequest:error: はiOS 27で非推奨
+    [[BGTaskScheduler sharedScheduler] submitTaskRequest:bgAppRefreshTaskRequest
+                                       completionHandler:^(NSError * _Nullable error) {
+        OwnTracksLogDebug("[OwnTracksAppDelegate] submitTaskRequest %@ @ %@ %@",
+                          bgAppRefreshTaskRequest.identifier,
+                          bgAppRefreshTaskRequest.earliestBeginDate,
+                          error);
+    }];
 }
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
@@ -224,7 +226,8 @@
                       UNNotificationPresentationOptionSound);
 }
 
-- (void)applicationWillResignActive:(UIApplication *)application {
+// 改造mod9: UIApplicationDelegateのactive系はiOS 26で非推奨。SceneDelegateから呼ぶ
+- (void)appWillResignActive {
     OwnTracksLogDefault("[OwnTracksAppDelegate] applicationWillResignActive");
 }
 
@@ -261,13 +264,6 @@
     [center addNotificationRequest:request withCompletionHandler:^(NSError * _Nullable error) {
         //
     }];
-}
-
--(BOOL)application:(UIApplication *)app
-           openURL:(NSURL *)url
-           options:(NSDictionary<NSString *,id> *)options {
-    OwnTracksLogDefault("[OwnTracksAppDelegate] openURL %@ options %@", url, options);
-    return [self openURL:url];
 }
 
 - (BOOL)openURL:(NSURL *)url {
@@ -564,7 +560,7 @@
     return TRUE;
 }
 
-- (void)applicationDidBecomeActive:(UIApplication *)application {
+- (void)appDidBecomeActive {
     OwnTracksLogDefault("[OwnTracksAppDelegate] applicationDidBecomeActive");
     
     [self.connection connectToLast];
@@ -682,8 +678,7 @@
     [self.connection disconnect];
 }
 
-- (void)application:(UIApplication *)application
-performActionForShortcutItem:(UIApplicationShortcutItem *)shortcutItem completionHandler:(void (^)(BOOL))completionHandler {
+- (BOOL)performShortcutItem:(UIApplicationShortcutItem *)shortcutItem {
     OwnTracksLogDefault("[OwnTracksAppDelegate] performActionForShortcutItem %{public}@", shortcutItem.type);
     if ([shortcutItem.type isEqualToString:@"org.mqttitude.MQTTitude.movemode"]) {
         LocationMonitoring monitoring = LocationMonitoringMove;
@@ -694,7 +689,7 @@ performActionForShortcutItem:(UIApplicationShortcutItem *)shortcutItem completio
         [Settings setInt:(int)[LocationManager sharedInstance].monitoring
                   forKey:@"monitoring_preference" inMOC:moc];
         [CoreData.sharedInstance sync:moc];
-        completionHandler(TRUE);
+        return TRUE;
     } else if ([shortcutItem.type isEqualToString:@"org.mqttitude.MQTTitude.significantmode"]) {
         LocationMonitoring monitoring = LocationMonitoringSignificant;
         [LocationManager sharedInstance].monitoring = monitoring;
@@ -704,7 +699,7 @@ performActionForShortcutItem:(UIApplicationShortcutItem *)shortcutItem completio
         [Settings setInt:(int)[LocationManager sharedInstance].monitoring
                   forKey:@"monitoring_preference" inMOC:moc];
         [CoreData.sharedInstance sync:moc];
-        completionHandler(TRUE);
+        return TRUE;
     } else if ([shortcutItem.type isEqualToString:@"org.mqttitude.MQTTitude.manualmode"]) {
         LocationMonitoring monitoring = LocationMonitoringManual;
         [LocationManager sharedInstance].monitoring = monitoring;
@@ -714,7 +709,7 @@ performActionForShortcutItem:(UIApplicationShortcutItem *)shortcutItem completio
         [Settings setInt:(int)[LocationManager sharedInstance].monitoring
                   forKey:@"monitoring_preference" inMOC:moc];
         [CoreData.sharedInstance sync:moc];
-        completionHandler(TRUE);
+        return TRUE;
     } else if ([shortcutItem.type isEqualToString:@"org.mqttitude.MQTTitude.quietmode"]) {
         LocationMonitoring monitoring = LocationMonitoringQuiet;
         [LocationManager sharedInstance].monitoring = monitoring;
@@ -724,10 +719,10 @@ performActionForShortcutItem:(UIApplicationShortcutItem *)shortcutItem completio
         [Settings setInt:(int)[LocationManager sharedInstance].monitoring
                   forKey:@"monitoring_preference" inMOC:moc];
         [CoreData.sharedInstance sync:moc];
-        completionHandler(TRUE);
+        return TRUE;
         
     } else {
-        completionHandler(FALSE);
+        return FALSE;
     }
 }
 
@@ -757,7 +752,7 @@ performActionForShortcutItem:(UIApplicationShortcutItem *)shortcutItem completio
     [self publishLocation:location trigger:@"v" withPOI:nil withImage:nil withImageName:nil];
 }
 
-- (void)regionEvent:(CLRegion *)region enter:(BOOL)enter {
+- (void)regionEvent:(OTRegion *)region enter:(BOOL)enter {
     [self background];
     NSManagedObjectContext *moc = CoreData.sharedInstance.mainMOC;
     if ([LocationManager sharedInstance].monitoring != LocationMonitoringQuiet &&
@@ -821,7 +816,7 @@ performActionForShortcutItem:(UIApplicationShortcutItem *)shortcutItem completio
             }
             json[@"tid"] = myself.effectiveTid;
             json[@"event"] = enter ? @"enter" : @"leave";
-            json[@"t"] =  [region isKindOfClass:[CLBeaconRegion class]] ? @"b" : @"c";
+            json[@"t"] = @"c";
             
             if (fabs(location.timestamp.timeIntervalSince1970 -
                      [NSDate date].timeIntervalSince1970) > 1.0) {
@@ -829,7 +824,7 @@ performActionForShortcutItem:(UIApplicationShortcutItem *)shortcutItem completio
             }
             
             for (Region *anyRegion in myself.hasRegions) {
-                if ([region.identifier isEqualToString:anyRegion.CLregion.identifier]) {
+                if ([region.identifier isEqualToString:anyRegion.otRegion.identifier]) {
                     anyRegion.name = anyRegion.name;
                     json[@"desc"] = components[0];
                     json[@"wtst"] = [NSNumber doubleValueWithZeroDecimals:anyRegion.tst.timeIntervalSince1970];
@@ -840,13 +835,6 @@ performActionForShortcutItem:(UIApplicationShortcutItem *)shortcutItem completio
                                    topicAlias:@(2)
                                           qos:[Settings theQosInMOC:moc]
                                        retain:NO];
-                    if ([region isKindOfClass:[CLBeaconRegion class]]) {
-                        if ((anyRegion.radius).doubleValue < 0) {
-                            anyRegion.lat = @(location.coordinate.latitude);
-                            anyRegion.lon = @(location.coordinate.longitude);
-                            [self sendRegion:anyRegion];
-                        }
-                    }
                     
                     NSArray <NSString *> *components = [region.identifier componentsSeparatedByString:@"|"];
                     if (components.count == 3) {
@@ -867,26 +855,47 @@ performActionForShortcutItem:(UIApplicationShortcutItem *)shortcutItem completio
                 }
             }
             
-            if ([region isKindOfClass:[CLBeaconRegion class]]) {
-                [self publishLocation:[LocationManager sharedInstance].location trigger:@"b" withPOI:nil withImage:nil withImageName:nil];
-            } else {
-                [self publishLocation:[LocationManager sharedInstance].location trigger:@"c" withPOI:nil withImage:nil withImageName:nil];
-            }
+            [self publishLocation:[LocationManager sharedInstance].location trigger:@"c" withPOI:nil withImage:nil withImageName:nil];
         } else {
             if ([LocationManager sharedInstance].monitoring != LocationMonitoringMove) {
                 [self publishLocation:[LocationManager sharedInstance].location trigger:@"C" withPOI:nil withImage:nil withImageName:nil];
+            }
+            if (!enter) {
+                [self resumeFromStationary];
             }
         }
     }
 }
 
-- (void)regionState:(CLRegion *)region inside:(BOOL)inside {
+// 改造mod9・案1: 静止中に置いた+followを出たら、Workerの返事を待たずにMoveへ戻す。
+// 改造EでSignificantにした後だけ（|1|2等の範囲の中にいる間は切り替えない）
+- (void)resumeFromStationary {
+    LocationManager *lm = [LocationManager sharedInstance];
+    if (!lm.stationaryArmed || lm.monitoring != LocationMonitoringSignificant) {
+        return;
+    }
+    for (NSString *identifier in lm.insideCircularRegions.allKeys) {
+        if (![identifier hasPrefix:@"+"]) {
+            OwnTracksLogDefault("[OwnTracksAppDelegate] follow exit inside %{public}@, stay", identifier);
+            return;
+        }
+    }
+    OwnTracksLogDefault("[OwnTracksAppDelegate] follow exit -> move");
+    NSManagedObjectContext *moc = CoreData.sharedInstance.mainMOC;
+    lm.monitoring = LocationMonitoringMove;
+    [[NSUserDefaults standardUserDefaults] setBool:FALSE forKey:@"downgraded"];
+    [[NSUserDefaults standardUserDefaults] setBool:FALSE forKey:@"adapted"];
+    [Settings setInt:(int)LocationMonitoringMove forKey:@"monitoring_preference" inMOC:moc];
+    [CoreData.sharedInstance sync:moc];
+}
+
+- (void)regionState:(OTRegion *)region inside:(BOOL)inside {
     OwnTracksLogDebug("[OwnTracksAppDelegate] regionState %@ i:%d", region.identifier, inside);
     Friend *myself = [Friend existsFriendWithTopic:[Settings theGeneralTopicInMOC:CoreData.sharedInstance.mainMOC]
                             inManagedObjectContext:CoreData.sharedInstance.mainMOC];
     
     for (Region *anyRegion in myself.hasRegions) {
-        if ([region.identifier isEqualToString:anyRegion.CLregion.identifier]) {
+        if ([region.identifier isEqualToString:anyRegion.otRegion.identifier]) {
             anyRegion.name = anyRegion.name;
         }
     }
@@ -1463,22 +1472,23 @@ performActionForShortcutItem:(UIApplicationShortcutItem *)shortcutItem completio
         return FALSE;
     }
     
-    // Update +follow region
+    // Update +follow region（改造mod9: Moveの点だけで置き直す。Significant中の粗い点では動かさない）
     for (Region *anyRegion in friend.hasRegions) {
-        if (anyRegion.CLregion.isFollow) {
+        if ([LocationManager sharedInstance].monitoring == LocationMonitoringMove &&
+            anyRegion.otRegion.isFollow) {
             if ((anyRegion.radius).doubleValue > 0) {
                 anyRegion.lat = @(location.coordinate.latitude);
                 anyRegion.lon = @(location.coordinate.longitude);
-                double time = [anyRegion.CLregion.identifier substringFromIndex:1].doubleValue;
+                double time = [anyRegion.otRegion.identifier substringFromIndex:1].doubleValue;
                 if (time == HUGE_VAL || time == -HUGE_VAL || time == 0.0) {
                     time = 30.0;
                 }
                 if (location.speed >= 0.0) {
-                    anyRegion.radius = @(MAX(location.speed * time, 50.0));
+                    anyRegion.radius = @(MIN(MAX(location.speed * time, 50.0), 500.0));
                 } else {
-                    anyRegion.radius = @(MAX(location.horizontalAccuracy, 50.0));
+                    anyRegion.radius = @(MIN(MAX(location.horizontalAccuracy, 50.0), 500.0));
                 }
-                [[LocationManager sharedInstance] startRegion:anyRegion.CLregion];
+                [[LocationManager sharedInstance] startRegion:anyRegion.otRegion];
             }
         }
     }
@@ -1502,9 +1512,8 @@ performActionForShortcutItem:(UIApplicationShortcutItem *)shortcutItem completio
     NSMutableArray <NSString *> *inRegions = [[NSMutableArray alloc] init];
     NSMutableArray <NSString *> *inRids = [[NSMutableArray alloc] init];
     for (Region *region in friend.hasRegions) {
-        if (!region.CLregion.isFollow) {
-            if ([LocationManager sharedInstance].insideCircularRegions[region.name] ||
-                [LocationManager sharedInstance].insideBeaconRegions[region.name]) {
+        if (!region.otRegion.isFollow) {
+            if ([LocationManager sharedInstance].insideCircularRegions[region.name]) {
                 [inRegions addObject:region.name];
                 [inRids addObject:region.getAndFillRid];
             }
@@ -1680,7 +1689,7 @@ performActionForShortcutItem:(UIApplicationShortcutItem *)shortcutItem completio
             if (lastLocationWithMovement && [lastLocationWithMovement.timestamp timeIntervalSinceNow] < -adapt * 60.0) {
                 BOOL insideFollowRegion = FALSE;
                 for (Region *region in friend.hasRegions) {
-                    if (region.CLregion.isFollow) {
+                    if (region.otRegion.isFollow) {
                         if ([LocationManager sharedInstance].insideCircularRegions[region.name]) {
                             insideFollowRegion = TRUE;
                             break;

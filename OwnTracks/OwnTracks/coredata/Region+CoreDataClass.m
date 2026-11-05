@@ -36,11 +36,6 @@
 }
 @end
 
-@implementation CLRegion (follow)
-- (BOOL)isFollow {
-    return [self.identifier hasPrefix:@"+"];
-}
-@end
 
 @implementation Region
 
@@ -94,14 +89,12 @@
 }
 
 - (NSString *)subtitle {
-    CLRegion *CLregion = self.CLregion;
-
-    if ([CLregion isKindOfClass:[CLCircularRegion class]]) {
+    if (self.otRegion) {
         return [NSString stringWithFormat:@"%g,%g r:%gm",
                 (self.lat).doubleValue,
                 (self.lon).doubleValue,
                 (self.radius).doubleValue];
-    } else if ([CLregion isKindOfClass:[CLBeaconRegion class]]) {
+    } else if (self.uuid) {
         return [NSString stringWithFormat:@"%@:%@:%@",
                 self.uuid,
                 self.major,
@@ -114,43 +107,14 @@
     }
 }
 
-- (CLRegion * _Nullable)CLregion {
-    CLRegion *region = nil;
-
-    if (self.name && self.name.length) {
-
-        if ((self.radius).doubleValue > 0) {
-            region = [[CLCircularRegion alloc] initWithCenter:self.coordinate
-                                                       radius:(self.radius).doubleValue
-                                                   identifier:self.name];
-        } else {
-            if (self.uuid) {
-                CLBeaconRegion *beaconRegion;
-                NSUUID *uuid = [[NSUUID alloc] initWithUUIDString:self.uuid];
-
-                if ((self.major).unsignedIntValue > 0) {
-                    if ((self.minor).unsignedIntValue > 0) {
-                        beaconRegion = [[CLBeaconRegion alloc]
-                                        initWithUUID:uuid
-                                        major:(self.major).unsignedIntValue
-                                        minor:(self.minor).unsignedIntValue
-                                        identifier:self.name];
-                    } else {
-                        beaconRegion = [[CLBeaconRegion alloc]
-                                        initWithUUID:uuid
-                                        major:(self.major).unsignedIntValue
-                                        identifier:self.name];
-                    }
-                } else {
-                    beaconRegion = [[CLBeaconRegion alloc]
-                                    initWithUUID:uuid
-                                    identifier:self.name];
-                }
-                region = beaconRegion;
-            }
-        }
+// 改造mod9: 円の範囲だけ（ビーコンの範囲は監視しない。CLBeaconRegionはiOS 27.3で非推奨）
+- (OTRegion * _Nullable)otRegion {
+    if (self.name && self.name.length && (self.radius).doubleValue > 0) {
+        return [OTRegion regionWithIdentifier:self.name
+                                       center:self.coordinate
+                                       radius:(self.radius).doubleValue];
     }
-    return region;
+    return nil;
 }
 
 @end

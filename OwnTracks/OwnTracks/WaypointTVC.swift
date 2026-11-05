@@ -143,8 +143,7 @@ class WaypointTVC: UITableViewController {
     @IBAction func navigatePressed(_ sender: UIButton) {
         if waypoint != nil && waypoint!.lat != nil && waypoint!.lon != nil {
             let coord = CLLocationCoordinate2D(latitude: waypoint!.lat!.doubleValue, longitude: waypoint!.lon!.doubleValue);
-            let place = MKPlacemark(coordinate: coord);
-            let destination = MKMapItem(placemark: place);
+            let destination = MKMapItem(location: CLLocation(latitude: coord.latitude, longitude: coord.longitude), address: nil);
             destination.name = waypoint!.belongsTo?.nameOrTopic;
             MKMapItem.openMaps(with: [destination],
                                launchOptions: [MKLaunchOptionsDirectionsModeKey:MKLaunchOptionsDirectionsModeDriving]);
