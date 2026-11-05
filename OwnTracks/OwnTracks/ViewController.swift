@@ -9,6 +9,55 @@
 import Foundation
 import UIKit
 import MapKit
+import WebKit
+import AppIntents
+
+// 改造R4: Basic認証はOwnTracksの設定のユーザー名・パスワードで答える
+extension ViewController: WKNavigationDelegate {
+    func webView(_ webView: WKWebView, didReceive challenge: URLAuthenticationChallenge,
+                 completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+        let moc = CoreData.sharedInstance().mainMOC;
+        if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodHTTPBasic,
+           challenge.previousFailureCount == 0,
+           let u = Settings.string(forKey: "user_preference", inMOC: moc) as String?,
+           let p = Settings.string(forKey: "pass_preference", inMOC: moc) as String? {
+            completionHandler(.useCredential, URLCredential(user: u, password: p, persistence: .forSession));
+        } else {
+            completionHandler(.performDefaultHandling, nil);
+        }
+    }
+}
+
+// 改造①: ショートカットのWi-Fi切断から呼ぶ。画面を開かず、今の時刻で1点すぐ送ってからMoveにする
+struct LeaveHomeIntent: AppIntent {
+    static var title: LocalizedStringResource = "Leave Home";
+    static var openAppWhenRun: Bool = false;
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        let lm = LocationManager.sharedInstance();
+        if let last = lm.location,
+           let app = UIApplication.shared.delegate as? OwnTracksAppDelegate {
+            // 最後の点の位置に、今の時刻を付けて送る（Move以外ではまとめずにすぐ送られる）
+            let now = CLLocation(coordinate: last.coordinate, altitude: last.altitude,
+                                 horizontalAccuracy: last.horizontalAccuracy,
+                                 verticalAccuracy: last.verticalAccuracy, timestamp: Date());
+            _ = app.sendNow(now, withPOI: nil, withImage: nil, withImageName: nil);
+        }
+        if lm.monitoring != .move {
+            lm.monitoring = .move;
+            UserDefaults.standard.set(false, forKey: "downgraded");
+            UserDefaults.standard.set(false, forKey: "adapted");
+            Settings.setInt(Int32(LocationMonitoring.move.rawValue),
+                            forKey: "monitoring_preference",
+                            inMOC: CoreData.sharedInstance().mainMOC);
+            CoreData.sharedInstance().sync(CoreData.sharedInstance().mainMOC);
+        }
+        // 送信が終わるまで少し待つ
+        try? await Task.sleep(nanoseconds: 8_000_000_000);
+        return .result();
+    }
+}
 
 class ViewController: UIViewController, MKMapViewDelegate, NSFetchedResultsControllerDelegate {
     @IBOutlet weak var mapView: MKMapView!;
@@ -70,6 +119,41 @@ class ViewController: UIViewController, MKMapViewDelegate, NSFetchedResultsContr
         }
         noMap();
         reloaded();
+        showWebMap();
+    }
+
+    // 改造R4: Appleの地図は隠し、Workerの/map?src=xをアプリの中で表示する
+    var webMap: WKWebView?;
+
+    func showWebMap() {
+        mapView.isHidden = true;
+        let web = WKWebView(frame: .zero);
+        web.navigationDelegate = self;
+        web.translatesAutoresizingMaskIntoConstraints = false;
+        view.addSubview(web);
+        NSLayoutConstraint.activate([
+            web.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            web.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            web.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            web.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+        ]);
+        webMap = web;
+        reloadWebMap();
+    }
+
+    // 送信先URL（…/pubx）の同じホストの/map?src=xを開く
+    func reloadWebMap() {
+        let moc = CoreData.sharedInstance().mainMOC;
+        guard let s = Settings.string(forKey: "url_preference", inMOC: moc) as String?,
+              var c = URLComponents(string: s) else { return; }
+        c.path = "/map";
+        c.query = "src=x";
+        if let url = c.url { webMap?.load(URLRequest(url: url)); }
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated);
+        if webMap?.url != nil { webMap?.reload(); }
     }
     
     override func viewDidAppear(_ animated: Bool) {
