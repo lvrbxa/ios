@@ -259,23 +259,8 @@ static LocationManager *theInstance = nil;
     OwnTracksLogDebug("[LocationManager] start");
     [self authorize];
     
-    self.altimeterAuthorizationStatus = [CMAltimeter authorizationStatus];
-    self.altimeterIsRelativeAltitudeAvailable = [CMAltimeter isRelativeAltitudeAvailable];
-    OwnTracksLogDefault("[LocationManager] CMAltimeter status=%ld, available=%d",
-              (long)self.altimeterAuthorizationStatus,
-              self.altimeterIsRelativeAltitudeAvailable);
-    
-    if (self.altimeterIsRelativeAltitudeAvailable &&
-        (self.altimeterAuthorizationStatus == CMAuthorizationStatusNotDetermined ||
-         self.altimeterAuthorizationStatus == CMAuthorizationStatusAuthorized)) {
-        OwnTracksLogDebug("[LocationManager] startRelativeAltitudeUpdatesToQueue");
-        [self.altimeter startRelativeAltitudeUpdatesToQueue:[NSOperationQueue mainQueue]
-                                                withHandler:^(CMAltitudeData *altitudeData, NSError *error) {
-            OwnTracksLogDebug("[LocationManager] altitudeData %@ error %{public}@", altitudeData, error);
-            self.altitudeData = altitudeData;
-        }];
-    }
-    
+    // 改造R1: 高度計（気圧p）は使わないので動かさない
+
     self.motionActivityManagerAuthorizationStatus = [CMMotionActivityManager authorizationStatus];
     self.motionActivityManagerIsActivityAvailable = [CMMotionActivityManager isActivityAvailable];
     OwnTracksLogDefault("[LocationManager] CMMotionActivityManager status=%ld, available=%d",
