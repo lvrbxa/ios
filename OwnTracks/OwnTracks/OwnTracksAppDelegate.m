@@ -15,7 +15,6 @@
 #import "History+CoreDataClass.h"
 #import "Settings.h"
 #import "OwnTracking.h"
-#import "Tours.h"
 #import "ConnType.h"
 #import "NSNumber+decimals.h"
 #import "Validation.h"
@@ -1316,9 +1315,7 @@ performActionForShortcutItem:(UIApplicationShortcutItem *)shortcutItem completio
 }
 
 - (void)performResponse:(NSDictionary *)dictionary {
-    if ([[Tours sharedInstance] processResponse:dictionary]) {
-    } else {
-    }
+    // 改造R6: Toursは削除
 }
 
 - (void)performSetConfiguration:(NSDictionary *)dictionary {

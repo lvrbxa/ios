@@ -35,18 +35,6 @@ class WaypointTVC: UITableViewController {
     @IBOutlet weak var UIpressure: UITextField!
     @IBOutlet weak var UImotionActivities: UITextField!
 
-    @IBAction func setPerson(_ segue: UIStoryboardSegue) {
-        if segue.source is PersonTVC {
-            let personTVC = segue.source as! PersonTVC;
-            if waypoint != nil && waypoint!.managedObjectContext != nil && waypoint!.belongsTo != nil {
-                waypoint!.belongsTo!.contactId = personTVC.contactId;
-                CoreData.sharedInstance().sync(waypoint!.managedObjectContext!);
-                title = waypoint!.belongsTo!.nameOrTopic
-                tableView.reloadData()
-            }
-        }
-    }
-        
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated);
         

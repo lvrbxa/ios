@@ -4,7 +4,6 @@
 #import "OwnTracksAppDelegate.h"
 #import "OwnTracksLog.h"
 #import "CoreData.h"
-#import "Tours.h"
 #import "Connection.h"
 #import "Waypoint+CoreDataClass.h"
 #import "Region+CoreDataClass.h"

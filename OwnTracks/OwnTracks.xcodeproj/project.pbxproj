@@ -47,8 +47,6 @@
 		845AA1BC1B4846AF00945856 /* OwnTracks-64.png in Resources */ = {isa = PBXBuildFile; fileRef = 845AA1B91B4846AF00945856 /* OwnTracks-64.png */; };
 		845AA1BD1B4846AF00945856 /* OwnTracks-320.png in Resources */ = {isa = PBXBuildFile; fileRef = 845AA1BA1B4846AF00945856 /* OwnTracks-320.png */; };
 		846B38E92785B50B003E4852 /* elgolfo1.gpx in Resources */ = {isa = PBXBuildFile; fileRef = 846B38E82785B50B003E4852 /* elgolfo1.gpx */; };
-		846EFA342F6813550088232B /* FriendsTVC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 846EFA332F6813550088232B /* FriendsTVC.swift */; };
-		846EFA352F682A4E0088232B /* FriendTableViewCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 846EFA2C2F680B0C0088232B /* FriendTableViewCell.swift */; };
 		846EFA372F69B9E20088232B /* WaypointTVC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 846EFA362F69B9E20088232B /* WaypointTVC.swift */; };
 		846EFA392F6A963E0088232B /* OwnTracksEditTVC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 846EFA382F6A963E0088232B /* OwnTracksEditTVC.swift */; };
 		846EFA3B2F6ABED20088232B /* TabBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 846EFA3A2F6ABED20088232B /* TabBarController.swift */; };
@@ -75,14 +73,12 @@
 		84C3F45C2CEF904F004DB332 /* AssetsLibrary.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 84C3F45B2CEF904F004DB332 /* AssetsLibrary.framework */; };
 		84C3F45D2CF09F91004DB332 /* Photos.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 84C3F4572CEF8911004DB332 /* Photos.framework */; };
 		84C3F45E2CF09F9B004DB332 /* PhotosUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 84C3F4592CEF891B004DB332 /* PhotosUI.framework */; };
-		84C7C0352898FAF90088A544 /* Tours.m in Sources */ = {isa = PBXBuildFile; fileRef = 84C7C0342898FAF90088A544 /* Tours.m */; };
 		84CC5A521FEC71850010314C /* OwnTracks-29.png in Resources */ = {isa = PBXBuildFile; fileRef = 84CC5A511FEC71840010314C /* OwnTracks-29.png */; };
 		84D6B47D25C844A500B2AC07 /* NSNumber+decimals.m in Sources */ = {isa = PBXBuildFile; fileRef = 84D6B47C25C844A500B2AC07 /* NSNumber+decimals.m */; };
 		84DB10222F6C54D900DF0651 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84DB101F2F6C41D500DF0651 /* ViewController.swift */; };
 		84DC826F2E0757CE0045CD05 /* OwnTracksBatteryTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 84DC826E2E0757CE0045CD05 /* OwnTracksBatteryTests.m */; };
 		84DE749824A9E1C600C0DA68 /* Intents.intentdefinition in Sources */ = {isa = PBXBuildFile; fileRef = 84DE749B24A9E1C600C0DA68 /* Intents.intentdefinition */; };
 		84DE749924A9E1C600C0DA68 /* Intents.intentdefinition in Sources */ = {isa = PBXBuildFile; fileRef = 84DE749B24A9E1C600C0DA68 /* Intents.intentdefinition */; };
-		84E03DBC2F655996006756BE /* PersonTVC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84E03DBB2F655996006756BE /* PersonTVC.swift */; };
 		84E2C4511EC34B3B00BC02CE /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 841D1A221C8AF70900DC5765 /* Localizable.strings */; };
 		84E3AE8E2F62BBC8009335B6 /* PhotoAnnotationV.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84E3AE8D2F62BBC8009335B6 /* PhotoAnnotationV.swift */; };
 		84E3AE902F62CB58009335B6 /* FriendAnnotationV.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84E3AE8F2F62CB58009335B6 /* FriendAnnotationV.swift */; };
@@ -214,8 +210,6 @@
 		845AA1BA1B4846AF00945856 /* OwnTracks-320.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "OwnTracks-320.png"; sourceTree = "<group>"; };
 		84635BCA2E30F93400B72E62 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Intents.strings; sourceTree = "<group>"; };
 		846B38E82785B50B003E4852 /* elgolfo1.gpx */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xml; path = elgolfo1.gpx; sourceTree = "<group>"; };
-		846EFA2C2F680B0C0088232B /* FriendTableViewCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendTableViewCell.swift; sourceTree = "<group>"; };
-		846EFA332F6813550088232B /* FriendsTVC.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendsTVC.swift; sourceTree = "<group>"; };
 		846EFA362F69B9E20088232B /* WaypointTVC.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaypointTVC.swift; sourceTree = "<group>"; };
 		846EFA382F6A963E0088232B /* OwnTracksEditTVC.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OwnTracksEditTVC.swift; sourceTree = "<group>"; };
 		846EFA3A2F6ABED20088232B /* TabBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabBarController.swift; sourceTree = "<group>"; };
@@ -268,8 +262,6 @@
 		84C3F4592CEF891B004DB332 /* PhotosUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = PhotosUI.framework; path = System/Library/Frameworks/PhotosUI.framework; sourceTree = SDKROOT; };
 		84C3F45B2CEF904F004DB332 /* AssetsLibrary.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AssetsLibrary.framework; path = System/Library/Frameworks/AssetsLibrary.framework; sourceTree = SDKROOT; };
 		84C756A61A89F706003BC8A8 /* Model 7.4.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = "Model 7.4.xcdatamodel"; sourceTree = "<group>"; };
-		84C7C0332898FAF90088A544 /* Tours.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Tours.h; sourceTree = "<group>"; };
-		84C7C0342898FAF90088A544 /* Tours.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Tours.m; sourceTree = "<group>"; };
 		84C8E2742D54C14D006F9E41 /* Model 18.3.0.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = "Model 18.3.0.xcdatamodel"; sourceTree = "<group>"; };
 		84CC5A511FEC71840010314C /* OwnTracks-29.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "OwnTracks-29.png"; sourceTree = "<group>"; };
 		84CE578E2C8745B8007689E5 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
@@ -281,7 +273,6 @@
 		84DC826E2E0757CE0045CD05 /* OwnTracksBatteryTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = OwnTracksBatteryTests.m; sourceTree = "<group>"; };
 		84DE749724A9A68B00C0DA68 /* OwnTracksIntents.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = OwnTracksIntents.entitlements; sourceTree = "<group>"; };
 		84DE749A24A9E1C600C0DA68 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.intentdefinition; name = Base; path = Base.lproj/Intents.intentdefinition; sourceTree = "<group>"; };
-		84E03DBB2F655996006756BE /* PersonTVC.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonTVC.swift; sourceTree = "<group>"; };
 		84E3AE8D2F62BBC8009335B6 /* PhotoAnnotationV.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoAnnotationV.swift; sourceTree = "<group>"; };
 		84E3AE8F2F62CB58009335B6 /* FriendAnnotationV.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendAnnotationV.swift; sourceTree = "<group>"; };
 		84E40200231413D400F1D6E6 /* History+CoreDataProperties.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "History+CoreDataProperties.h"; sourceTree = "<group>"; };
@@ -436,8 +427,6 @@
 				8400D9721D83825E00DEA134 /* HTTP.plist */,
 				8411B88F189FE9CE0019D2D6 /* Settings.h */,
 				8411B890189FE9CE0019D2D6 /* Settings.m */,
-				84C7C0332898FAF90088A544 /* Tours.h */,
-				84C7C0342898FAF90088A544 /* Tours.m */,
 				84D6B47B25C844A500B2AC07 /* NSNumber+decimals.h */,
 				84D6B47C25C844A500B2AC07 /* NSNumber+decimals.m */,
 				845451B03002865F00AF9FCE /* OwnTracksFormatter.swift */,
@@ -557,9 +546,6 @@
 			isa = PBXGroup;
 			children = (
 				846EFA362F69B9E20088232B /* WaypointTVC.swift */,
-				846EFA332F6813550088232B /* FriendsTVC.swift */,
-				846EFA2C2F680B0C0088232B /* FriendTableViewCell.swift */,
-				84E03DBB2F655996006756BE /* PersonTVC.swift */,
 				84E3AE8F2F62CB58009335B6 /* FriendAnnotationV.swift */,
 			);
 			name = Friends;
@@ -797,7 +783,6 @@
 				8411B83A189FDB140019D2D6 /* main.m in Sources */,
 				84DE749824A9E1C600C0DA68 /* Intents.intentdefinition in Sources */,
 				84DB10222F6C54D900DF0651 /* ViewController.swift in Sources */,
-				846EFA352F682A4E0088232B /* FriendTableViewCell.swift in Sources */,
 				84E40204231413D400F1D6E6 /* History+CoreDataClass.m in Sources */,
 				846EFA3F2F6BECDF0088232B /* NavigationController.swift in Sources */,
 				8405CB622F153DD9008C2580 /* ModesTVC.swift in Sources */,
@@ -824,7 +809,6 @@
 				847667B32DF9B8C7001AD950 /* Waypoint+CoreDataProperties.m in Sources */,
 				84E3AE8E2F62BBC8009335B6 /* PhotoAnnotationV.swift in Sources */,
 				849260422B0247C200F6DC13 /* Validation.m in Sources */,
-				846EFA342F6813550088232B /* FriendsTVC.swift in Sources */,
 				84AFD40B2434486200F1E922 /* OwnTracking.m in Sources */,
 				8411B891189FE9CE0019D2D6 /* Settings.m in Sources */,
 				845299E71DFA004000A4DC21 /* Friend+CoreDataClass.m in Sources */,
@@ -834,9 +818,7 @@
 				846EFA3B2F6ABED20088232B /* TabBarController.swift in Sources */,
 				84E40205231413D400F1D6E6 /* History+CoreDataProperties.m in Sources */,
 				84E8A18D1BB94782002518AA /* Region+CoreDataProperties.m in Sources */,
-				84C7C0352898FAF90088A544 /* Tours.m in Sources */,
 				842E6ECE20BEE96F001928FA /* Region+CoreDataClass.m in Sources */,
-				84E03DBC2F655996006756BE /* PersonTVC.swift in Sources */,
 				84A452BA2F35157000AA6A29 /* StatusTVC.swift in Sources */,
 			);
 		};

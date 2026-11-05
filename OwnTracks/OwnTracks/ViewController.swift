@@ -36,7 +36,8 @@ struct LeaveHomeIntent: AppIntent {
     @MainActor
     func perform() async throws -> some IntentResult {
         let lm = LocationManager.sharedInstance();
-        if let last = lm.location,
+        let last = lm.location;
+        if CLLocationCoordinate2DIsValid(last.coordinate),
            let app = UIApplication.shared.delegate as? OwnTracksAppDelegate {
             // 最後の点の位置に、今の時刻を付けて送る（Move以外ではまとめずにすぐ送られる）
             let now = CLLocation(coordinate: last.coordinate, altitude: last.altitude,
