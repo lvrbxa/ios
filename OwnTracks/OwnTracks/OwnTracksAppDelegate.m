@@ -747,6 +747,11 @@
     [self publishLocation:location trigger:@"t" withPOI:nil withImage:nil withImageName:nil];
 }
 
+- (void)wakeLocation:(CLLocation *)location {
+    [self background];
+    [self publishLocation:location trigger:@"C" withPOI:nil withImage:nil withImageName:nil];
+}
+
 - (void)visitLocation:(CLLocation *)location {
     [self background];
     [self publishLocation:location trigger:@"v" withPOI:nil withImage:nil withImageName:nil];
@@ -857,36 +862,15 @@
             
             [self publishLocation:[LocationManager sharedInstance].location trigger:@"c" withPOI:nil withImage:nil withImageName:nil];
         } else {
-            if ([LocationManager sharedInstance].monitoring != LocationMonitoringMove) {
+            LocationMonitoring monitoring = [LocationManager sharedInstance].monitoring;
+            if (monitoring == LocationMonitoringSignificant && !enter) {
+                // mod12: 追いかけの円を出たら、すぐ精度の良い点を取って判定する（送るのはその点）
+                [[LocationManager sharedInstance] startWakeCheck:@"follow"];
+            } else if (monitoring != LocationMonitoringMove) {
                 [self publishLocation:[LocationManager sharedInstance].location trigger:@"C" withPOI:nil withImage:nil withImageName:nil];
             }
-            if (!enter) {
-                [self resumeFromStationary];
-            }
         }
     }
-}
-
-// 改造mod9・案1: 静止中に置いた+followを出たら、Workerの返事を待たずにMoveへ戻す。
-// 改造EでSignificantにした後だけ（|1|2等の範囲の中にいる間は切り替えない）
-- (void)resumeFromStationary {
-    LocationManager *lm = [LocationManager sharedInstance];
-    if (!lm.stationaryArmed || lm.monitoring != LocationMonitoringSignificant) {
-        return;
-    }
-    for (NSString *identifier in lm.insideCircularRegions.allKeys) {
-        if (![identifier hasPrefix:@"+"]) {
-            OwnTracksLogDefault("[OwnTracksAppDelegate] follow exit inside %{public}@, stay", identifier);
-            return;
-        }
-    }
-    OwnTracksLogDefault("[OwnTracksAppDelegate] follow exit -> move");
-    NSManagedObjectContext *moc = CoreData.sharedInstance.mainMOC;
-    lm.monitoring = LocationMonitoringMove;
-    [[NSUserDefaults standardUserDefaults] setBool:FALSE forKey:@"downgraded"];
-    [[NSUserDefaults standardUserDefaults] setBool:FALSE forKey:@"adapted"];
-    [Settings setInt:(int)LocationMonitoringMove forKey:@"monitoring_preference" inMOC:moc];
-    [CoreData.sharedInstance sync:moc];
 }
 
 - (void)regionState:(OTRegion *)region inside:(BOOL)inside {
@@ -1484,9 +1468,9 @@
                     time = 30.0;
                 }
                 if (location.speed >= 0.0) {
-                    anyRegion.radius = @(MIN(MAX(location.speed * time, 50.0), 500.0));
+                    anyRegion.radius = @(MIN(MAX(location.speed * time, 20.0), 500.0));
                 } else {
-                    anyRegion.radius = @(MIN(MAX(location.horizontalAccuracy, 50.0), 500.0));
+                    anyRegion.radius = @(MIN(MAX(location.horizontalAccuracy, 20.0), 500.0));
                 }
                 [[LocationManager sharedInstance] startRegion:anyRegion.otRegion];
             }
@@ -1638,47 +1622,7 @@
         return TRUE;
     }
     
-    if ([UIDevice currentDevice].isBatteryMonitoringEnabled) {
-        UIDeviceBatteryState batteryState = [UIDevice currentDevice].batteryState;
-        float batteryLevel = [UIDevice currentDevice].batteryLevel;
-        int downgrade = [Settings intForKey:@"downgrade_preference"
-                                      inMOC:moc];
-        if ([LocationManager sharedInstance].monitoring == LocationMonitoringMove) {
-            if (batteryState != UIDeviceBatteryStateFull &&
-                batteryState != UIDeviceBatteryStateCharging &&
-                batteryLevel < downgrade / 100.0) {
-                // Move Mode, but battery is not full, not charging and less than downgrade%
-                [[NSUserDefaults standardUserDefaults] setBool:TRUE forKey:@"downgraded"];
-                OwnTracksLogDebug("[OwnTracksAppDelegate] downgraded TRUE");
-                LocationManager.sharedInstance.monitoring = LocationMonitoringSignificant;
-                [Settings setInt:(int)[LocationManager sharedInstance].monitoring
-                          forKey:@"monitoring_preference" inMOC:moc];
-                [CoreData.sharedInstance sync:moc];
-                [self background];
-            } else {
-                // Move Mode, battery is full, charging or has more than downgrade%
-            }
-        } else {
-            if ([[NSUserDefaults standardUserDefaults] boolForKey:@"downgraded"]) {
-                if (batteryState == UIDeviceBatteryStateFull
-                    || batteryState == UIDeviceBatteryStateCharging ||
-                    batteryLevel >= downgrade / 100.0) {
-                    // not Move Mode, previously downgraded and battery is charging or full or more than downgrade%
-                    [[NSUserDefaults standardUserDefaults] setBool:FALSE forKey:@"downgraded"];
-                    OwnTracksLogDebug("[OwnTracksAppDelegate] downgraded FALSE");
-                    LocationManager.sharedInstance.monitoring = LocationMonitoringMove;
-                    [Settings setInt:(int)[LocationManager sharedInstance].monitoring
-                              forKey:@"monitoring_preference" inMOC:moc];
-                    [CoreData.sharedInstance sync:moc];
-                    [self background];
-                } else {
-                    // not Move Mode, previously downgraded but battery is not charging nor full
-                }
-            } else {
-                // not Move Mode, but not previously downgraded
-            }
-        }
-    }
+    // mod12: 電池による下げ（downgrade）はやめた
     
     if ([LocationManager sharedInstance].monitoring == LocationMonitoringMove) {
         CLLocation *lastLocationWithMovement = [LocationManager sharedInstance].lastLocationWithMovement;

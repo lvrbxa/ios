@@ -27,6 +27,7 @@
 - (void)newLocation:(CLLocation * _Nonnull)location;
 - (void)timerLocation:(CLLocation * _Nonnull)location;
 - (void)visitLocation:(CLLocation * _Nonnull)location;
+- (void)wakeLocation:(CLLocation * _Nonnull)location;
 - (void)regionEvent:(OTRegion * _Nonnull)region enter:(BOOL)enter;
 - (void)regionState:(OTRegion * _Nonnull)region inside:(BOOL)inside;
 
@@ -55,7 +56,6 @@ typedef NS_ENUM(NSInteger, LocationMonitoring) {
 @property (readonly, nonatomic) CLLocation * _Nonnull lastUsedLocation;
 @property (readonly, nonatomic) CLLocation * _Nonnull lastLocationWithMovement;
 // 改造mod9・案1: 改造Eで静止と判断してSignificantにした後、Moveになるまで真
-@property (readonly, nonatomic) BOOL stationaryArmed;
 
 @property (readonly, nonatomic) CLAuthorizationStatus locationManagerAuthorizationStatus;
 
@@ -75,6 +75,7 @@ typedef NS_ENUM(NSInteger, LocationMonitoring) {
 - (void)stop;
 
 - (void)startRegion:(OTRegion * _Nonnull)region NS_SWIFT_NAME(start(_:));
+- (void)startWakeCheck:(NSString * _Nonnull)reason;
 - (void)stopRegion:(OTRegion *_Nonnull)region NS_SWIFT_NAME(stop(_:));
 - (void)resetRegions;
 - (BOOL)monitoredRegion:(NSString *_Nonnull)identifier;
