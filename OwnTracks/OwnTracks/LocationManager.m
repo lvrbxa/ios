@@ -26,6 +26,7 @@
 @property (strong, nonatomic) NSMutableSet *pendingRegionEvents;
 // 改造mod9: CLMonitor（起動のたびに同じ名前で作る。準備ができるまでの操作は積んでおく）
 @property (strong, nonatomic) CLMonitor *monitor;
+@property (strong, nonatomic) CLServiceSession *serviceSession;
 @property (strong, nonatomic) NSMutableArray *pendingMonitorOps;
 @property (strong, nonatomic) NSMutableDictionary<NSString *, OTRegion *> *regions;
 @property (strong, nonatomic) NSMutableDictionary<NSString *, NSNumber *> *knownStates;
@@ -372,6 +373,13 @@ static LocationManager *theInstance = nil;
  */
 - (void)setupMonitor {
     __weak LocationManager *weakSelf = self;
+    // 改造mod10: 背景でCLMonitorのイベントを受けるため、Alwaysのサービスセッションを起動のたび（背景の起動も）に作って持つ。
+    // 無いとイベントにserviceSessionRequiredが付き、前面に出るまで届かない（Apple: Handling location updates in the background）
+    if (!self.serviceSession) {
+        self.serviceSession =
+        [CLServiceSession sessionRequiringAuthorization:CLServiceSessionAuthorizationRequirementAlways];
+        OwnTracksLogDefault("[LocationManager] service session always");
+    }
     CLMonitorConfiguration *config =
     [CLMonitorConfiguration configWithMonitorName:MONITOR_NAME
                                             queue:dispatch_get_main_queue()
@@ -897,6 +905,12 @@ static LocationManager *theInstance = nil;
         if (self.monitoring == LocationMonitoringMove &&
             self.lastUsedLocation &&
             [location distanceFromLocation:self.lastUsedLocation] < self.minDist) {
+            continue;
+        }
+
+        // 改造mod10: 範囲の監視の準備前は送らない（inregionsが空の点でWorkerが外出と誤判定するため）
+        if (!self.monitor) {
+            OwnTracksLogDefault("[LocationManager] location held (monitor not ready)");
             continue;
         }
 
