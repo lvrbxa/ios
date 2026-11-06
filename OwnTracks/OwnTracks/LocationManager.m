@@ -767,36 +767,43 @@ static LocationManager *theInstance = nil;
             self.lastBoostLocation = location;
         }
         self.lastUsedLocation = location;
-        [self checkOwnExit:location];
+        [self checkOwnRegions:location];
         [self.delegate timerLocation:location];
     } else {
         OwnTracksLogError("[LocationManager] activityTimer found no location");
     }
 }
 
-// 改造mod11: Moveの間は、精度の良い点が範囲の半径の外に出たら、iOSを待たずに「出」とする（すぐ送られる）。
-// 後から来るiOSの「出」は、状態が同じなのでイベントにならない
-- (void)checkOwnExit:(CLLocation *)location {
+// 改造mod11: Moveの間は、精度の良い点が範囲の半径の外に出たら「出」、中に入ったら「入」とする（iOSを待たずにすぐ送られる）。
+// 後から来るiOSの出入りは、状態が同じなのでイベントにならない
+- (void)checkOwnRegions:(CLLocation *)location {
     if (self.monitoring != LocationMonitoringMove ||
         location.horizontalAccuracy < 0 || location.horizontalAccuracy > BOOST_ACCURACY) {
         return;
     }
-    for (NSString *identifier in self.insideCircularRegions.allKeys) {
-        if ([identifier hasPrefix:@"+"] || [identifier hasPrefix:@"-"]) {
+    for (OTRegion *region in [self.regions.allValues copy]) {
+        NSString *identifier = region.identifier;
+        if ([identifier hasPrefix:@"+"] || [identifier hasPrefix:@"-"] || region.radius <= 0) {
             continue;
         }
-        OTRegion *region = self.regions[identifier];
-        if (!region || region.radius <= 0) {
-            continue;
+        // 「入」でmodeが変わったら、それ以降は判定しない
+        if (self.monitoring != LocationMonitoringMove) {
+            return;
         }
         CLLocation *center = [[CLLocation alloc] initWithLatitude:region.center.latitude
                                                         longitude:region.center.longitude];
         CLLocationDistance d = [location distanceFromLocation:center];
-        if (d > region.radius) {
+        BOOL inside = self.insideCircularRegions[identifier] != nil;
+        if (inside && d > region.radius) {
             OwnTracksLogDefault("[LocationManager] own exit %{public}@ d=%.0f r=%.0f",
                                 identifier, d, region.radius);
             [self setKnownState:region inside:FALSE];
             [self.delegate regionEvent:region enter:NO];
+        } else if (!inside && d <= region.radius) {
+            OwnTracksLogDefault("[LocationManager] own enter %{public}@ d=%.0f r=%.0f",
+                                identifier, d, region.radius);
+            [self setKnownState:region inside:TRUE];
+            [self.delegate regionEvent:region enter:YES];
         }
     }
 }
