@@ -767,9 +767,37 @@ static LocationManager *theInstance = nil;
             self.lastBoostLocation = location;
         }
         self.lastUsedLocation = location;
+        [self checkOwnExit:location];
         [self.delegate timerLocation:location];
     } else {
         OwnTracksLogError("[LocationManager] activityTimer found no location");
+    }
+}
+
+// 改造mod11: Moveの間は、精度の良い点が範囲の半径の外に出たら、iOSを待たずに「出」とする（すぐ送られる）。
+// 後から来るiOSの「出」は、状態が同じなのでイベントにならない
+- (void)checkOwnExit:(CLLocation *)location {
+    if (self.monitoring != LocationMonitoringMove ||
+        location.horizontalAccuracy < 0 || location.horizontalAccuracy > BOOST_ACCURACY) {
+        return;
+    }
+    for (NSString *identifier in self.insideCircularRegions.allKeys) {
+        if ([identifier hasPrefix:@"+"] || [identifier hasPrefix:@"-"]) {
+            continue;
+        }
+        OTRegion *region = self.regions[identifier];
+        if (!region || region.radius <= 0) {
+            continue;
+        }
+        CLLocation *center = [[CLLocation alloc] initWithLatitude:region.center.latitude
+                                                        longitude:region.center.longitude];
+        CLLocationDistance d = [location distanceFromLocation:center];
+        if (d > region.radius) {
+            OwnTracksLogDefault("[LocationManager] own exit %{public}@ d=%.0f r=%.0f",
+                                identifier, d, region.radius);
+            [self setKnownState:region inside:FALSE];
+            [self.delegate regionEvent:region enter:NO];
+        }
     }
 }
 

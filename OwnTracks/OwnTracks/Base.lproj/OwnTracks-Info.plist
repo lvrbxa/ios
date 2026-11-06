@@ -9,7 +9,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>${PRODUCT_NAME}</string>
+	<string>OwnTracks改</string>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
