@@ -41,6 +41,10 @@
 @property (strong, nonatomic) NSDate *lastWakeCheckEnd;
 @property (nonatomic) NSInteger badFixStreak;
 @property (nonatomic) BOOL boostRetried;
+// mod14: liveUpdatesの試験（記録だけ）。起動のたびに作り、止めない（止めると動き出しても再起動されない: Apple forum 810433）
+@property (strong, nonatomic) CLBackgroundActivitySession *backgroundSession;
+@property (strong, nonatomic) CLLocationUpdater *liveUpdater;
+@property (nonatomic) NSInteger liveStationary; // -1 未受信、0 移動、1 静止
 - (void)holdDownExpired:(NSTimer *)timer;
 
 @property (strong, nonatomic) NSMutableDictionary *insideCircularRegions;
@@ -153,7 +157,8 @@ static LocationManager *theInstance = nil;
                                                                  timestamp:[NSDate date]];
     self.pendingRegionEvents = [[NSMutableSet alloc] init];
     [self setupMonitor];
-    
+    [self setupLiveUpdates];
+
     [self authorize];
     
     [[NSNotificationCenter defaultCenter]
@@ -380,6 +385,43 @@ static LocationManager *theInstance = nil;
  * 改造mod9: CLMonitorによる範囲の監視
  *
  */
+// mod14: liveUpdatesを動かし、届いた点をログに残すだけ（送信・判定には使わない）。
+// 静止・移動の切り替わりは常に、mode 1の間は届くたびに記録する
+- (void)setupLiveUpdates {
+    if (!self.backgroundSession) {
+        self.backgroundSession = [CLBackgroundActivitySession backgroundActivitySession];
+    }
+    if (self.liveUpdater) {
+        return;
+    }
+    self.liveStationary = -1;
+    __weak LocationManager *weakSelf = self;
+    self.liveUpdater =
+    [CLLocationUpdater liveUpdaterWithQueue:dispatch_get_main_queue()
+                                    handler:^(CLUpdate *update) {
+        [weakSelf liveUpdate:update];
+    }];
+    [self.liveUpdater resume];
+    OwnTracksLogDefault("[LocationManager] live start");
+}
+
+- (void)liveUpdate:(CLUpdate *)update {
+    NSInteger stationary = update.stationary ? 1 : 0;
+    BOOL changed = stationary != self.liveStationary;
+    self.liveStationary = stationary;
+    if (!changed && self.monitoring != LocationMonitoringSignificant) {
+        return;
+    }
+    CLLocation *location = update.location;
+    CLLocation *last = self.lastUsedLocation;
+    OwnTracksLogDefault("[LocationManager] live stationary=%ld%{public}@ mode=%ld acc=%.0f d=%.0f unavail=%d",
+                        (long)stationary, changed ? @" (changed)" : @"",
+                        (long)self.monitoring,
+                        location ? location.horizontalAccuracy : -1.0,
+                        (location && last) ? [location distanceFromLocation:last] : -1.0,
+                        update.locationUnavailable);
+}
+
 - (void)setupMonitor {
     __weak LocationManager *weakSelf = self;
     // 改造mod10: 背景でCLMonitorのイベントを受けるため、Alwaysのサービスセッションを起動のたび（背景の起動も）に作って持つ。
@@ -664,6 +706,17 @@ static LocationManager *theInstance = nil;
         OwnTracksLogDefault("[LocationManager] monitoring set to %ld", (long)monitoring);
     }
     _monitoring = monitoring;
+    // mod14: 起こされた確認の途中でmode 1以外になったら、確認を終える
+    // （印が残ると、次の毎分の点が確認の結果として扱われ、送られなかった: 2026-11-07 16:37）
+    if (self.wakeChecking && monitoring != LocationMonitoringSignificant) {
+        OwnTracksLogDefault("[LocationManager] wake check cancel (mode %ld)", (long)monitoring);
+        self.wakeChecking = FALSE;
+        self.lastWakeCheckEnd = [NSDate date];
+        if (self.wakeTask != UIBackgroundTaskInvalid) {
+            [[UIApplication sharedApplication] endBackgroundTask:self.wakeTask];
+            self.wakeTask = UIBackgroundTaskInvalid;
+        }
+    }
     if (monitoring == LocationMonitoringMove) {
         [self saveStationaryCenter:nil]; // mod12: 動き出したら静止の円を消す
         [self.recentFixes removeAllObjects];
