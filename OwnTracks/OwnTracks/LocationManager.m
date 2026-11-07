@@ -35,6 +35,11 @@
 @property (copy, nonatomic) NSString *wakeReason;
 @property (nonatomic) UIBackgroundTaskIdentifier wakeTask;
 @property (strong, nonatomic) CLLocation *judgedLocation;
+// mod13: 円の外の点が続いた数（2点で「出」）、最後に起こされた判定の終わり、精度の悪い取得が続いた数
+@property (strong, nonatomic) NSMutableDictionary<NSString *, NSNumber *> *exitStreak;
+@property (strong, nonatomic) NSDate *lastWakeCheckEnd;
+@property (nonatomic) NSInteger badFixStreak;
+@property (nonatomic) BOOL boostRetried;
 - (void)holdDownExpired:(NSTimer *)timer;
 
 @property (strong, nonatomic) NSMutableDictionary *insideCircularRegions;
@@ -136,6 +141,7 @@ static LocationManager *theInstance = nil;
     self.knownStates = [[NSMutableDictionary alloc] init];
     self.initialPending = [[NSMutableSet alloc] init];
     self.recentFixes = [[NSMutableArray alloc] init];
+    self.exitStreak = [[NSMutableDictionary alloc] init];
     self.wakeTask = UIBackgroundTaskInvalid;
     self.lastUsedLocation = [[CLLocation alloc] initWithLatitude:0 longitude:0];
     self.lastLocationWithMovement = [[CLLocation alloc] initWithCoordinate:CLLocationCoordinate2DMake(0.0, 0.0)
@@ -743,10 +749,24 @@ static LocationManager *theInstance = nil;
     CLLocation *location = self.boostBest ? self.boostBest : self.manager.location;
     OwnTracksLogDefault("[LocationManager] boost timeout acc=%.0f",
                         location ? location.horizontalAccuracy : -1.0);
+    // mod13: 精度の悪い取得が2回続いたら、1回だけ取り直す
+    if (![self goodFix:location]) {
+        self.badFixStreak++;
+        if (self.badFixStreak >= 2 && !self.boostRetried) {
+            self.boostRetried = TRUE;
+            OwnTracksLogDefault("[LocationManager] boost retry bad=%ld", (long)self.badFixStreak);
+            [self startBoost];
+            return;
+        }
+    }
     [self finishBoost:location];
 }
 
 - (void)finishBoost:(CLLocation *)location {
+    if ([self goodFix:location]) {
+        self.badFixStreak = 0;
+    }
+    self.boostRetried = FALSE;
     BOOL wake = self.wakeChecking;
     [self endBoost];
     if (wake) {
@@ -774,14 +794,21 @@ static LocationManager *theInstance = nil;
     if (self.monitoring != LocationMonitoringMove) {
         return;
     }
-    [self judgeRegions:location];
+    [self judgeRegions:location src:@"move"];
 }
 
 // 場所の円（+・-で始まらない範囲）の出入りを、精度の良い点で判定する（mod12: mode 1で起こされたときも使う）
-- (void)judgeRegions:(CLLocation *)location {
+// mod13: 「出」は円の外の点が2点続いたら。訪問の通知で起こされたときは「出」を判定しない。判定は1行のログに出す
+- (void)judgeRegions:(CLLocation *)location src:(NSString *)src {
     if (![self goodFix:location]) {
+        OwnTracksLogDefault("[LocationManager] judge src=%{public}@ acc=%.0f -> skip (bad fix)",
+                            src, location ? location.horizontalAccuracy : -1.0);
         return;
     }
+    BOOL allowExit = ![src isEqualToString:@"visit"];
+    NSString *near = @"-";
+    CLLocationDistance nearD = -1, nearR = -1;
+    NSString *result = @"none";
     LocationMonitoring start = self.monitoring;
     for (OTRegion *region in [self.regions.allValues copy]) {
         NSString *identifier = region.identifier;
@@ -796,18 +823,40 @@ static LocationManager *theInstance = nil;
                                                         longitude:region.center.longitude];
         CLLocationDistance d = [location distanceFromLocation:center];
         BOOL inside = self.insideCircularRegions[identifier] != nil;
+        if (nearD < 0 || d - region.radius < nearD - nearR) {
+            near = identifier; nearD = d; nearR = region.radius;
+        }
         if (inside && d > region.radius) {
+            if (!allowExit) {
+                result = [NSString stringWithFormat:@"exit skipped (visit) %@", identifier];
+                continue;
+            }
+            NSInteger n = self.exitStreak[identifier].integerValue + 1;
+            if (n < 2) {
+                self.exitStreak[identifier] = @(n);
+                result = [NSString stringWithFormat:@"exit pending %@", identifier];
+                continue;
+            }
+            [self.exitStreak removeObjectForKey:identifier];
             OwnTracksLogDefault("[LocationManager] own exit %{public}@ d=%.0f r=%.0f",
                                 identifier, d, region.radius);
+            result = [NSString stringWithFormat:@"exit %@", identifier];
             [self setKnownState:region inside:FALSE];
             [self.delegate regionEvent:region enter:NO];
         } else if (!inside && d <= region.radius) {
+            [self.exitStreak removeObjectForKey:identifier];
             OwnTracksLogDefault("[LocationManager] own enter %{public}@ d=%.0f r=%.0f",
                                 identifier, d, region.radius);
+            result = [NSString stringWithFormat:@"enter %@", identifier];
             [self setKnownState:region inside:TRUE];
             [self.delegate regionEvent:region enter:YES];
+        } else if (inside) {
+            [self.exitStreak removeObjectForKey:identifier];
         }
     }
+    OwnTracksLogDefault("[LocationManager] judge src=%{public}@ acc=%.0f mode=%ld->%ld near=%{public}@ d=%.0f r=%.0f -> %{public}@",
+                        src, location.horizontalAccuracy, (long)start, (long)self.monitoring,
+                        near, nearD, nearR, result);
     // 場所の円に入ってmode 1になったら、起こされるように追いかけの円をここに置く
     if (start != LocationMonitoringSignificant && self.monitoring == LocationMonitoringSignificant) {
         [self armFollowAt:location];
@@ -922,6 +971,12 @@ static LocationManager *theInstance = nil;
     if (self.monitoring != LocationMonitoringSignificant || self.wakeChecking) {
         return;
     }
+    // mod13: 大きな移動の通知は、起こされた判定の直後（60秒以内）なら確かめ直さない（起動時の2回目を防ぐ）
+    if ([reason isEqualToString:@"significant"] && self.lastWakeCheckEnd &&
+        -[self.lastWakeCheckEnd timeIntervalSinceNow] < 60.0) {
+        OwnTracksLogDefault("[LocationManager] wake check skip %{public}@ (recent)", reason);
+        return;
+    }
     if (self.boostStart) {
         [self endBoost];
     }
@@ -938,6 +993,7 @@ static LocationManager *theInstance = nil;
 
 - (void)finishWakeCheck:(CLLocation *)location {
     self.wakeChecking = FALSE;
+    self.lastWakeCheckEnd = [NSDate date];
     NSString *reason = self.wakeReason;
     if (self.monitoring == LocationMonitoringSignificant) {
         [self.manager stopUpdatingLocation];
@@ -948,13 +1004,16 @@ static LocationManager *theInstance = nil;
         self.lastUsedLocation = location;
         self.judgedLocation = location;
         BOOL good = [self goodFix:location];
-        [self judgeRegions:location];
+        [self judgeRegions:location src:reason ? reason : @"wake"];
         if (self.monitoring == LocationMonitoringSignificant) {
             OTRegion *place = [self insidePlace];
             CLLocation *center = [self stationaryCenter];
             CLLocationDistance d = center ? [location distanceFromLocation:center] : -1;
-            if (good && !place && center && d > STATIONARY_EXIT) {
-                OwnTracksLogDefault("[LocationManager] wake check acc=%.0f d=%.0f -> move", location.horizontalAccuracy, d);
+            // mod13: 場所の円の外の点が1点だけ（出の確定待ち）なら、Moveにして次の点で確かめる
+            BOOL exitPending = self.exitStreak.count > 0;
+            if (good && ((!place && center && d > STATIONARY_EXIT) || exitPending)) {
+                OwnTracksLogDefault("[LocationManager] wake check %{public}@ acc=%.0f d=%.0f pending=%d -> move",
+                                    reason, location.horizontalAccuracy, d, exitPending);
                 // mode 1のうちに送る（すぐ送られる）。その後でMoveへ
                 [self.delegate wakeLocation:location];
                 self.monitoring = LocationMonitoringMove;

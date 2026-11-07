@@ -1436,7 +1436,16 @@
         OwnTracksLogError("[OwnTracksAppDelegate] settings not valid (yet)");
         return FALSE;
     }
-        
+
+    // mod13: 同じ点は1回だけ送る（出入り・mode変更のあとの重なりをなくす）。手動（u・p）は除く
+    static NSDate *lastPublishedTimestamp = nil;
+    if (![trigger isEqualToString:@"u"] && ![trigger isEqualToString:@"p"] &&
+        lastPublishedTimestamp && [location.timestamp isEqualToDate:lastPublishedTimestamp]) {
+        OwnTracksLogDefault("[OwnTracksAppDelegate] publish skip same point t=%{public}@", trigger ? trigger : @"-");
+        return FALSE;
+    }
+    lastPublishedTimestamp = location.timestamp;
+
     int ignoreInaccurateLocations =
     [Settings intForKey:@"ignoreinaccuratelocations_preference"
                   inMOC:moc];

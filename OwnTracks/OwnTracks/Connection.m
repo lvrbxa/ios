@@ -66,7 +66,6 @@
 
 #define RECONNECT_TIMER 1.0
 #define RECONNECT_TIMER_MAX 64.0
-#define BATCH_SECONDS 600.0 // 改造5: まとめて送る間隔
 #define BATCH_MAX 40 // 改造5: 1回に送る最大件数（Workerの上限16KBに収める）
 
 @implementation Connection
@@ -113,19 +112,8 @@
                     [self.delegate totalBuffered: self count:matches.count];
                     if (matches.count) {
                         Queue *queue = matches.firstObject;
-                        // 改造5: 最も古い待ちがBATCH_SECONDSを超えたか、BATCH_MAX件たまったら、配列でまとめて送る
-                        BOOL due = matches.count >= BATCH_MAX ||
-                            -[queue.timestamp timeIntervalSinceNow] >= BATCH_SECONDS;
-                        // 改造A: Move以外（すぐ止まる）か、出入りが待っていれば待たずに送る
-                        if (!due && [LocationManager sharedInstance].monitoring != LocationMonitoringMove) due = YES;
-                        if (!due) {
-                            NSData *tr = [@"\"_type\":\"transition\"" dataUsingEncoding:NSUTF8StringEncoding];
-                            for (Queue *q in matches) {
-                                if (q.data && [q.data rangeOfData:tr options:0 range:NSMakeRange(0, q.data.length)].location != NSNotFound) { due = YES; break; }
-                            }
-                        }
-
-                        if (self.state == state_starting && due) {
+                        // mod13: 待たずにすぐ送る（Moveの毎分の点も）。送れずにたまった分はBATCH_MAX件ずつ配列で送る
+                        if (self.state == state_starting) {
                             NSUInteger n = MIN(matches.count, (NSUInteger)BATCH_MAX);
                             NSMutableData *body = [NSMutableData dataWithBytes:"[" length:1];
                             for (NSUInteger i = 0; i < n; i++) {
