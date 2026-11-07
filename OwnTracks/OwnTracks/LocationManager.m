@@ -45,6 +45,7 @@
 @property (strong, nonatomic) CLBackgroundActivitySession *backgroundSession;
 @property (strong, nonatomic) CLLocationUpdater *liveUpdater;
 @property (nonatomic) NSInteger liveStationary; // -1 未受信、0 移動、1 静止
+@property (nonatomic) BOOL liveRunning; // mod16: updaterが受信中か（mode 1以外では一時停止）
 - (void)holdDownExpired:(NSTimer *)timer;
 
 @property (strong, nonatomic) NSMutableDictionary *insideCircularRegions;
@@ -404,6 +405,7 @@ static LocationManager *theInstance = nil;
     } else {
         [self.liveUpdater invalidate];
         self.liveUpdater = nil;
+        self.liveRunning = FALSE;
         [self.backgroundSession invalidate];
         self.backgroundSession = nil;
         OwnTracksLogDefault("[LocationManager] live off");
@@ -442,8 +444,30 @@ static LocationManager *theInstance = nil;
                                     handler:^(CLUpdate *update) {
         [weakSelf liveUpdate:update];
     }];
+    self.liveRunning = TRUE;
     [self.liveUpdater resume];
     OwnTracksLogDefault("[LocationManager] live start");
+    [self liveApplyMode];
+}
+
+// mod16: liveUpdatesはmode 1の間だけ受信する。mode 0・2では一時停止（セッションは残す）
+- (void)liveApplyMode {
+    if (!self.liveUpdater) {
+        return;
+    }
+    BOOL want = self.monitoring == LocationMonitoringSignificant;
+    if (want == self.liveRunning) {
+        return;
+    }
+    self.liveRunning = want;
+    if (want) {
+        self.liveStationary = -1; // 再開直後の最初の値では起こさない
+        [self.liveUpdater resume];
+        OwnTracksLogDefault("[LocationManager] live resume");
+    } else {
+        [self.liveUpdater pause];
+        OwnTracksLogDefault("[LocationManager] live pause (mode %ld)", (long)self.monitoring);
+    }
 }
 
 - (void)liveUpdate:(CLUpdate *)update {
@@ -456,7 +480,8 @@ static LocationManager *theInstance = nil;
         return;
     }
     NSInteger stationary = update.stationary ? 1 : 0;
-    BOOL changed = stationary != self.liveStationary;
+    NSInteger previous = self.liveStationary;
+    BOOL changed = stationary != previous;
     self.liveStationary = stationary;
     if (!changed && self.monitoring != LocationMonitoringSignificant) {
         return;
@@ -469,6 +494,10 @@ static LocationManager *theInstance = nil;
                         location ? location.horizontalAccuracy : -1.0,
                         (location && last) ? [location distanceFromLocation:last] : -1.0,
                         update.locationUnavailable);
+    // mod16: mode 1で静止→移動に変わったら、起こして確かめる
+    if (previous == 1 && stationary == 0 && self.monitoring == LocationMonitoringSignificant) {
+        [self startWakeCheck:@"live"];
+    }
 }
 
 - (void)setupMonitor {
@@ -770,6 +799,7 @@ static LocationManager *theInstance = nil;
         [self saveStationaryCenter:nil]; // mod12: 動き出したら静止の円を消す
         [self.recentFixes removeAllObjects];
     }
+    [self liveApplyMode];
     self.manager.pausesLocationUpdatesAutomatically = NO;
     self.manager.allowsBackgroundLocationUpdates = TRUE;
     
@@ -1083,7 +1113,8 @@ static LocationManager *theInstance = nil;
         return;
     }
     // mod13: 大きな移動の通知は、起こされた判定の直後（60秒以内）なら確かめ直さない（起動時の2回目を防ぐ）
-    if ([reason isEqualToString:@"significant"] && self.lastWakeCheckEnd &&
+    // mod16: liveUpdatesの動き出しも同じ扱い
+    if (([reason isEqualToString:@"significant"] || [reason isEqualToString:@"live"]) && self.lastWakeCheckEnd &&
         -[self.lastWakeCheckEnd timeIntervalSinceNow] < 60.0) {
         OwnTracksLogDefault("[LocationManager] wake check skip %{public}@ (recent)", reason);
         return;
