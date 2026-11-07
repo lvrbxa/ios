@@ -85,6 +85,8 @@ typedef NS_ENUM(NSInteger, LocationMonitoring) {
 @property (readonly, strong, nonatomic) NSMutableDictionary * _Nonnull insideCircularRegions;
 // mod13: 確定した「出」の、外に出た1点目（出入りの送信に使う）
 @property (strong, nonatomic) CLLocation * _Nullable exitAtLocation;
+// mod15: liveUpdatesのオン・オフ（地図タブのスイッチ。電池30%以下・充電なしで自動オフ）
+@property (nonatomic) BOOL liveEnabled;
 
 @end
 

@@ -67,6 +67,12 @@ class ViewController: UIViewController {
 
     var modes: UISegmentedControl?;
     var webMap: WKWebView?;
+    var liveSwitch: UISwitch?;
+
+    @objc func liveChanged(_ sender: UISwitch) {
+        LocationManager.sharedInstance().liveEnabled = sender.isOn;
+        sender.isOn = LocationManager.sharedInstance().liveEnabled;
+    }
 
     override func viewDidLoad() {
         super.viewDidLoad();
@@ -81,6 +87,7 @@ class ViewController: UIViewController {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated);
         updateAccuracyButton();
+        liveSwitch?.isOn = LocationManager.sharedInstance().liveEnabled;
         if webMap?.url != nil { webMap?.reload(); }
     }
 
@@ -105,6 +112,25 @@ class ViewController: UIViewController {
             m.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 10),
         ]);
         modes = m;
+
+        // mod15: モード切替の右に、liveUpdatesのオン・オフ
+        let label = UILabel();
+        label.text = "Live";
+        label.translatesAutoresizingMaskIntoConstraints = false;
+        let sw = UISwitch();
+        sw.translatesAutoresizingMaskIntoConstraints = false;
+        sw.isOn = LocationManager.sharedInstance().liveEnabled;
+        sw.addTarget(self, action: #selector(liveChanged(_:)), for: .valueChanged);
+        view.addSubview(label);
+        view.addSubview(sw);
+        NSLayoutConstraint.activate([
+            sw.centerYAnchor.constraint(equalTo: m.centerYAnchor),
+            sw.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -10),
+            label.centerYAnchor.constraint(equalTo: m.centerYAnchor),
+            label.trailingAnchor.constraint(equalTo: sw.leadingAnchor, constant: -6),
+            label.leadingAnchor.constraint(greaterThanOrEqualTo: m.trailingAnchor, constant: 8),
+        ]);
+        liveSwitch = sw;
     }
 
     // モード切替の下に、送信先URL（…/pubx）と同じホストの/map?src=xを表示する

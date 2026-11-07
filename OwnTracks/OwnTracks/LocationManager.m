@@ -387,7 +387,48 @@ static LocationManager *theInstance = nil;
  */
 // mod14: liveUpdatesを動かし、届いた点をログに残すだけ（送信・判定には使わない）。
 // 静止・移動の切り替わりは常に、mode 1の間は届くたびに記録する
+#define LIVE_OFF_KEY @"liveOff"
+#define LIVE_BATTERY_MIN 0.30
+
+- (BOOL)liveEnabled {
+    return ![[NSUserDefaults standardUserDefaults] boolForKey:LIVE_OFF_KEY];
+}
+
+// mod15: オフにするとupdaterとセッションを捨てる（動き出しでの再起動も無くなる）。オンは前面で（セッションは前面でしか始められない）
+- (void)setLiveEnabled:(BOOL)enabled {
+    [self willChangeValueForKey:@"liveEnabled"];
+    [[NSUserDefaults standardUserDefaults] setBool:!enabled forKey:LIVE_OFF_KEY];
+    [self didChangeValueForKey:@"liveEnabled"];
+    if (enabled) {
+        [self setupLiveUpdates];
+    } else {
+        [self.liveUpdater invalidate];
+        self.liveUpdater = nil;
+        [self.backgroundSession invalidate];
+        self.backgroundSession = nil;
+        OwnTracksLogDefault("[LocationManager] live off");
+    }
+}
+
+- (BOOL)liveBatteryLow {
+    UIDevice *device = [UIDevice currentDevice];
+    device.batteryMonitoringEnabled = YES;
+    float level = device.batteryLevel;
+    UIDeviceBatteryState state = device.batteryState;
+    return level >= 0 && level <= LIVE_BATTERY_MIN &&
+        state != UIDeviceBatteryStateCharging && state != UIDeviceBatteryStateFull;
+}
+
 - (void)setupLiveUpdates {
+    if (!self.liveEnabled) {
+        OwnTracksLogDefault("[LocationManager] live disabled");
+        return;
+    }
+    if ([self liveBatteryLow]) {
+        OwnTracksLogDefault("[LocationManager] live auto off (battery)");
+        self.liveEnabled = NO;
+        return;
+    }
     if (!self.backgroundSession) {
         self.backgroundSession = [CLBackgroundActivitySession backgroundActivitySession];
     }
@@ -406,6 +447,14 @@ static LocationManager *theInstance = nil;
 }
 
 - (void)liveUpdate:(CLUpdate *)update {
+    if (!self.liveUpdater) {
+        return;
+    }
+    if ([self liveBatteryLow]) {
+        OwnTracksLogDefault("[LocationManager] live auto off (battery)");
+        self.liveEnabled = NO;
+        return;
+    }
     NSInteger stationary = update.stationary ? 1 : 0;
     BOOL changed = stationary != self.liveStationary;
     self.liveStationary = stationary;
