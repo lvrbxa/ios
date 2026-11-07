@@ -83,6 +83,8 @@ typedef NS_ENUM(NSInteger, LocationMonitoring) {
 @property (NS_NONATOMIC_IOSONLY, readonly) BOOL insideCircularRegion;
 - (BOOL)insideCircularRegion:(NSString * _Nonnull)identifier;
 @property (readonly, strong, nonatomic) NSMutableDictionary * _Nonnull insideCircularRegions;
+// mod13: 確定した「出」の、外に出た1点目（出入りの送信に使う）
+@property (strong, nonatomic) CLLocation * _Nullable exitAtLocation;
 
 @end
 

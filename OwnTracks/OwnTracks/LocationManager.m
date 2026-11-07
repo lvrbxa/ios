@@ -37,6 +37,7 @@
 @property (strong, nonatomic) CLLocation *judgedLocation;
 // mod13: 円の外の点が続いた数（2点で「出」）、最後に起こされた判定の終わり、精度の悪い取得が続いた数
 @property (strong, nonatomic) NSMutableDictionary<NSString *, NSNumber *> *exitStreak;
+@property (strong, nonatomic) NSMutableDictionary<NSString *, CLLocation *> *exitFirst;
 @property (strong, nonatomic) NSDate *lastWakeCheckEnd;
 @property (nonatomic) NSInteger badFixStreak;
 @property (nonatomic) BOOL boostRetried;
@@ -142,6 +143,7 @@ static LocationManager *theInstance = nil;
     self.initialPending = [[NSMutableSet alloc] init];
     self.recentFixes = [[NSMutableArray alloc] init];
     self.exitStreak = [[NSMutableDictionary alloc] init];
+    self.exitFirst = [[NSMutableDictionary alloc] init];
     self.wakeTask = UIBackgroundTaskInvalid;
     self.lastUsedLocation = [[CLLocation alloc] initWithLatitude:0 longitude:0];
     self.lastLocationWithMovement = [[CLLocation alloc] initWithCoordinate:CLLocationCoordinate2DMake(0.0, 0.0)
@@ -834,17 +836,23 @@ static LocationManager *theInstance = nil;
             NSInteger n = self.exitStreak[identifier].integerValue + 1;
             if (n < 2) {
                 self.exitStreak[identifier] = @(n);
+                self.exitFirst[identifier] = location;
                 result = [NSString stringWithFormat:@"exit pending %@", identifier];
                 continue;
             }
             [self.exitStreak removeObjectForKey:identifier];
+            // mod13: 出の時刻・位置は、外に出た1点目にする
+            self.exitAtLocation = self.exitFirst[identifier] ? self.exitFirst[identifier] : location;
+            [self.exitFirst removeObjectForKey:identifier];
             OwnTracksLogDefault("[LocationManager] own exit %{public}@ d=%.0f r=%.0f",
                                 identifier, d, region.radius);
             result = [NSString stringWithFormat:@"exit %@", identifier];
             [self setKnownState:region inside:FALSE];
             [self.delegate regionEvent:region enter:NO];
+            self.exitAtLocation = nil;
         } else if (!inside && d <= region.radius) {
             [self.exitStreak removeObjectForKey:identifier];
+            [self.exitFirst removeObjectForKey:identifier];
             OwnTracksLogDefault("[LocationManager] own enter %{public}@ d=%.0f r=%.0f",
                                 identifier, d, region.radius);
             result = [NSString stringWithFormat:@"enter %@", identifier];
@@ -852,6 +860,7 @@ static LocationManager *theInstance = nil;
             [self.delegate regionEvent:region enter:YES];
         } else if (inside) {
             [self.exitStreak removeObjectForKey:identifier];
+            [self.exitFirst removeObjectForKey:identifier];
         }
     }
     OwnTracksLogDefault("[LocationManager] judge src=%{public}@ acc=%.0f mode=%ld->%ld near=%{public}@ d=%.0f r=%.0f -> %{public}@",

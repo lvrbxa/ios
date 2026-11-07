@@ -805,7 +805,12 @@
                                     inManagedObjectContext:moc];
             
             CLLocation *location = [LocationManager sharedInstance].location;
-            
+            // mod13: アプリが確定した「出」は、外に出た1点目の時刻・位置で送る
+            CLLocation *exitAt = enter ? nil : [LocationManager sharedInstance].exitAtLocation;
+            if (exitAt) {
+                location = exitAt;
+            }
+
             NSMutableDictionary *json = [[NSMutableDictionary alloc] init];
             json[@"_type"] = @"transition";
             
@@ -813,8 +818,8 @@
             
             json[@"lon"] = [NSNumber doubleValueWithSixDecimals:location.coordinate.longitude];
             
-            // 改造B: 出入りの時刻は検知した時刻にする（位置は最後の点のまま）
-            json[@"tst"] = [NSNumber doubleValueWithZeroDecimals:[NSDate date].timeIntervalSince1970];
+            // 改造B: 出入りの時刻は検知した時刻にする（位置は最後の点のまま）。mod13: アプリが確定した出は1点目の時刻
+            json[@"tst"] = [NSNumber doubleValueWithZeroDecimals:(exitAt ? exitAt.timestamp : [NSDate date]).timeIntervalSince1970];
             
             if (location.horizontalAccuracy >= 0.0) {
                 json[@"acc"] = [NSNumber doubleValueWithZeroDecimals:location.horizontalAccuracy];
