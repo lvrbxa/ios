@@ -29,6 +29,7 @@
 - (void)visitLocation:(CLLocation * _Nonnull)location;
 - (void)wakeLocation:(CLLocation * _Nonnull)location;
 - (void)regionEvent:(OTRegion * _Nonnull)region enter:(BOOL)enter;
+- (void)regionMode:(OTRegion * _Nonnull)region enter:(BOOL)enter;
 - (void)regionState:(OTRegion * _Nonnull)region inside:(BOOL)inside;
 
 @end
@@ -83,10 +84,8 @@ typedef NS_ENUM(NSInteger, LocationMonitoring) {
 @property (NS_NONATOMIC_IOSONLY, readonly) BOOL insideCircularRegion;
 - (BOOL)insideCircularRegion:(NSString * _Nonnull)identifier;
 @property (readonly, strong, nonatomic) NSMutableDictionary * _Nonnull insideCircularRegions;
-// mod13: 確定した「出」の、外に出た1点目（出入りの送信に使う）
-@property (strong, nonatomic) CLLocation * _Nullable exitAtLocation;
-// mod15: liveUpdatesのオン・オフ（地図タブのスイッチ。電池30%以下・充電なしで自動オフ）
-@property (nonatomic) BOOL liveEnabled;
+// mod13: 確定した「出」の、外に出た1点目。mod17: iOSの知らせの後に測った点（出入りの送信に使う）
+@property (strong, nonatomic) CLLocation * _Nullable eventLocation;
 
 @end
 

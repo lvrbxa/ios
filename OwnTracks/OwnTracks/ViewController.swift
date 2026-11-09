@@ -28,51 +28,27 @@ extension ViewController: WKNavigationDelegate {
     }
 }
 
-// 改造①: ショートカットのWi-Fi切断から呼ぶ。画面を開かず、今の時刻で1点すぐ送ってからMoveにする
+// 改造①: ショートカットのWi-Fi切断から呼ぶ。画面を開かず、今の時刻で1点（印h）すぐ送ってからMoveにする
 struct LeaveHomeIntent: AppIntent {
     static var title: LocalizedStringResource = "Leave Home";
     static var openAppWhenRun: Bool = false;
 
     @MainActor
     func perform() async throws -> some IntentResult {
-        let lm = LocationManager.sharedInstance();
-        let last = lm.location;
-        if CLLocationCoordinate2DIsValid(last.coordinate),
-           let app = UIApplication.shared.delegate as? OwnTracksAppDelegate {
-            // 最後の点の位置に、今の時刻を付けて送る（Move以外ではまとめずにすぐ送られる）
-            let now = CLLocation(coordinate: last.coordinate, altitude: last.altitude,
-                                 horizontalAccuracy: last.horizontalAccuracy,
-                                 verticalAccuracy: last.verticalAccuracy, timestamp: Date());
-            _ = app.sendNow(now, withPOI: nil, withImage: nil, withImageName: nil);
-        }
-        if lm.monitoring != .move {
-            lm.monitoring = .move;
-            UserDefaults.standard.set(false, forKey: "downgraded");
-            UserDefaults.standard.set(false, forKey: "adapted");
-            Settings.setInt(Int32(LocationMonitoring.move.rawValue),
-                            forKey: "monitoring_preference",
-                            inMOC: CoreData.sharedInstance().mainMOC);
-            CoreData.sharedInstance().sync(CoreData.sharedInstance().mainMOC);
-        }
+        (UIApplication.shared.delegate as? OwnTracksAppDelegate)?.leaveHome();
         // 送信が終わるまで少し待つ
         try? await Task.sleep(nanoseconds: 8_000_000_000);
         return .result();
     }
 }
 
-// 改造R4: Appleの地図は削除。モード切替・Webの地図（/map?src=x）・今すぐ送る・精度の表示だけを持つ
+// 改造R4: Appleの地図は削除。モード切替・Webの地図（/map）・今すぐ送る・精度の表示だけを持つ
 class ViewController: UIViewController {
     @IBOutlet weak var actionButton: UIBarButtonItem!;
     @IBOutlet weak var accuracyButton: UIBarButtonItem!;
 
     var modes: UISegmentedControl?;
     var webMap: WKWebView?;
-    var liveSwitch: UISwitch?;
-
-    @objc func liveChanged(_ sender: UISwitch) {
-        LocationManager.sharedInstance().liveEnabled = sender.isOn;
-        sender.isOn = LocationManager.sharedInstance().liveEnabled;
-    }
 
     override func viewDidLoad() {
         super.viewDidLoad();
@@ -87,7 +63,6 @@ class ViewController: UIViewController {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated);
         updateAccuracyButton();
-        liveSwitch?.isOn = LocationManager.sharedInstance().liveEnabled;
         if webMap?.url != nil { webMap?.reload(); }
     }
 
@@ -112,28 +87,9 @@ class ViewController: UIViewController {
             m.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 10),
         ]);
         modes = m;
-
-        // mod15: モード切替の右に、liveUpdatesのオン・オフ
-        let label = UILabel();
-        label.text = "Live";
-        label.translatesAutoresizingMaskIntoConstraints = false;
-        let sw = UISwitch();
-        sw.translatesAutoresizingMaskIntoConstraints = false;
-        sw.isOn = LocationManager.sharedInstance().liveEnabled;
-        sw.addTarget(self, action: #selector(liveChanged(_:)), for: .valueChanged);
-        view.addSubview(label);
-        view.addSubview(sw);
-        NSLayoutConstraint.activate([
-            sw.centerYAnchor.constraint(equalTo: m.centerYAnchor),
-            sw.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -10),
-            label.centerYAnchor.constraint(equalTo: m.centerYAnchor),
-            label.trailingAnchor.constraint(equalTo: sw.leadingAnchor, constant: -6),
-            label.leadingAnchor.constraint(greaterThanOrEqualTo: m.trailingAnchor, constant: 8),
-        ]);
-        liveSwitch = sw;
     }
 
-    // モード切替の下に、送信先URL（…/pubx）と同じホストの/map?src=xを表示する
+    // モード切替の下に、送信先URL（…/pubx）と同じホストの/mapを表示する
     func showWebMap() {
         let web = WKWebView(frame: .zero);
         web.navigationDelegate = self;
@@ -150,7 +106,7 @@ class ViewController: UIViewController {
         guard let s = Settings.string(forKey: "url_preference", inMOC: moc) as String?,
               var c = URLComponents(string: s) else { return; }
         c.path = "/map";
-        c.query = "src=x";
+        c.query = nil;
         if let url = c.url { web.load(URLRequest(url: url)); }
     }
 

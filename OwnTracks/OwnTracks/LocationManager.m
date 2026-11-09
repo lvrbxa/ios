@@ -41,11 +41,11 @@
 @property (strong, nonatomic) NSDate *lastWakeCheckEnd;
 @property (nonatomic) NSInteger badFixStreak;
 @property (nonatomic) BOOL boostRetried;
-// mod14: liveUpdatesの試験（記録だけ）。起動のたびに作り、止めない（止めると動き出しても再起動されない: Apple forum 810433）
-@property (strong, nonatomic) CLBackgroundActivitySession *backgroundSession;
-@property (strong, nonatomic) CLLocationUpdater *liveUpdater;
-@property (nonatomic) NSInteger liveStationary; // -1 未受信、0 移動、1 静止
-@property (nonatomic) BOOL liveRunning; // mod16: updaterが受信中か（mode 1以外では一時停止）
+// mod17: 起こされた確認で、場所の円の外だった1点目（2点続けて外ならMove）
+@property (strong, nonatomic) CLLocation *wakeFirst;
+// mod17: iOSの出入りの知らせを、1点測ってから送る（[OTRegion, @(enter)]の並び）
+@property (strong, nonatomic) NSMutableArray<NSArray *> *measureEvents;
+@property (nonatomic) UIBackgroundTaskIdentifier measureTask;
 - (void)holdDownExpired:(NSTimer *)timer;
 
 @property (strong, nonatomic) NSMutableDictionary *insideCircularRegions;
@@ -82,7 +82,6 @@
 #define STATIONARY_CENTER_SECONDS 240.0 // mod12: 静止の円の中心に使う点の期間
 #define STATIONARY_MIN_POINTS 4 // mod12: 静止の判定に要る点の数
 #define STATIONARY_SPREAD 50.0 // mod12: 静止とみなす点の散らばり（m）
-#define STATIONARY_EXIT 40.0 // mod12: 静止の円の半径。起こされた点がこの外ならMoveへ
 #define FOLLOW_MIN_RADIUS 20.0 // mod12: 追いかけの円の最小の半径
 #define MONITOR_NAME @"ot" // 改造mod9: CLMonitorの名前
 
@@ -150,6 +149,8 @@ static LocationManager *theInstance = nil;
     self.exitStreak = [[NSMutableDictionary alloc] init];
     self.exitFirst = [[NSMutableDictionary alloc] init];
     self.wakeTask = UIBackgroundTaskInvalid;
+    self.measureTask = UIBackgroundTaskInvalid;
+    self.measureEvents = [[NSMutableArray alloc] init];
     self.lastUsedLocation = [[CLLocation alloc] initWithLatitude:0 longitude:0];
     self.lastLocationWithMovement = [[CLLocation alloc] initWithCoordinate:CLLocationCoordinate2DMake(0.0, 0.0)
                                                                   altitude:(0.0)
@@ -158,7 +159,6 @@ static LocationManager *theInstance = nil;
                                                                  timestamp:[NSDate date]];
     self.pendingRegionEvents = [[NSMutableSet alloc] init];
     [self setupMonitor];
-    [self setupLiveUpdates];
 
     [self authorize];
     
@@ -386,120 +386,6 @@ static LocationManager *theInstance = nil;
  * 改造mod9: CLMonitorによる範囲の監視
  *
  */
-// mod14: liveUpdatesを動かし、届いた点をログに残すだけ（送信・判定には使わない）。
-// 静止・移動の切り替わりは常に、mode 1の間は届くたびに記録する
-#define LIVE_OFF_KEY @"liveOff"
-#define LIVE_BATTERY_MIN 0.30
-
-- (BOOL)liveEnabled {
-    return ![[NSUserDefaults standardUserDefaults] boolForKey:LIVE_OFF_KEY];
-}
-
-// mod15: オフにするとupdaterとセッションを捨てる（動き出しでの再起動も無くなる）。オンは前面で（セッションは前面でしか始められない）
-- (void)setLiveEnabled:(BOOL)enabled {
-    [self willChangeValueForKey:@"liveEnabled"];
-    [[NSUserDefaults standardUserDefaults] setBool:!enabled forKey:LIVE_OFF_KEY];
-    [self didChangeValueForKey:@"liveEnabled"];
-    if (enabled) {
-        [self setupLiveUpdates];
-    } else {
-        [self.liveUpdater invalidate];
-        self.liveUpdater = nil;
-        self.liveRunning = FALSE;
-        [self.backgroundSession invalidate];
-        self.backgroundSession = nil;
-        OwnTracksLogDefault("[LocationManager] live off");
-    }
-}
-
-- (BOOL)liveBatteryLow {
-    UIDevice *device = [UIDevice currentDevice];
-    device.batteryMonitoringEnabled = YES;
-    float level = device.batteryLevel;
-    UIDeviceBatteryState state = device.batteryState;
-    return level >= 0 && level <= LIVE_BATTERY_MIN &&
-        state != UIDeviceBatteryStateCharging && state != UIDeviceBatteryStateFull;
-}
-
-- (void)setupLiveUpdates {
-    if (!self.liveEnabled) {
-        OwnTracksLogDefault("[LocationManager] live disabled");
-        return;
-    }
-    if ([self liveBatteryLow]) {
-        OwnTracksLogDefault("[LocationManager] live auto off (battery)");
-        self.liveEnabled = NO;
-        return;
-    }
-    if (!self.backgroundSession) {
-        self.backgroundSession = [CLBackgroundActivitySession backgroundActivitySession];
-    }
-    if (self.liveUpdater) {
-        return;
-    }
-    self.liveStationary = -1;
-    __weak LocationManager *weakSelf = self;
-    self.liveUpdater =
-    [CLLocationUpdater liveUpdaterWithQueue:dispatch_get_main_queue()
-                                    handler:^(CLUpdate *update) {
-        [weakSelf liveUpdate:update];
-    }];
-    self.liveRunning = TRUE;
-    [self.liveUpdater resume];
-    OwnTracksLogDefault("[LocationManager] live start");
-    [self liveApplyMode];
-}
-
-// mod16: liveUpdatesはmode 1の間だけ受信する。mode 0・2では一時停止（セッションは残す）
-- (void)liveApplyMode {
-    if (!self.liveUpdater) {
-        return;
-    }
-    BOOL want = self.monitoring == LocationMonitoringSignificant;
-    if (want == self.liveRunning) {
-        return;
-    }
-    self.liveRunning = want;
-    if (want) {
-        self.liveStationary = -1; // 再開直後の最初の値では起こさない
-        [self.liveUpdater resume];
-        OwnTracksLogDefault("[LocationManager] live resume");
-    } else {
-        [self.liveUpdater pause];
-        OwnTracksLogDefault("[LocationManager] live pause (mode %ld)", (long)self.monitoring);
-    }
-}
-
-- (void)liveUpdate:(CLUpdate *)update {
-    if (!self.liveUpdater) {
-        return;
-    }
-    if ([self liveBatteryLow]) {
-        OwnTracksLogDefault("[LocationManager] live auto off (battery)");
-        self.liveEnabled = NO;
-        return;
-    }
-    NSInteger stationary = update.stationary ? 1 : 0;
-    NSInteger previous = self.liveStationary;
-    BOOL changed = stationary != previous;
-    self.liveStationary = stationary;
-    if (!changed && self.monitoring != LocationMonitoringSignificant) {
-        return;
-    }
-    CLLocation *location = update.location;
-    CLLocation *last = self.lastUsedLocation;
-    OwnTracksLogDefault("[LocationManager] live stationary=%ld%{public}@ mode=%ld acc=%.0f d=%.0f unavail=%d",
-                        (long)stationary, changed ? @" (changed)" : @"",
-                        (long)self.monitoring,
-                        location ? location.horizontalAccuracy : -1.0,
-                        (location && last) ? [location distanceFromLocation:last] : -1.0,
-                        update.locationUnavailable);
-    // mod16: mode 1で静止→移動に変わったら、起こして確かめる
-    if (previous == 1 && stationary == 0 && self.monitoring == LocationMonitoringSignificant) {
-        [self startWakeCheck:@"live"];
-    }
-}
-
 - (void)setupMonitor {
     __weak LocationManager *weakSelf = self;
     // 改造mod10: 背景でCLMonitorのイベントを受けるため、Alwaysのサービスセッションを起動のたび（背景の起動も）に作って持つ。
@@ -663,7 +549,7 @@ static LocationManager *theInstance = nil;
         if (![self removeHoldDown:region]) {
             OwnTracksLogDefault("[LocationManager] enter %{public}@", identifier);
             [self setKnownState:region inside:TRUE];
-            [self.delegate regionEvent:region enter:YES];
+            [self measureRegionEvent:region enter:YES];
         } else {
             self.knownStates[identifier] = @(TRUE);
         }
@@ -675,8 +561,60 @@ static LocationManager *theInstance = nil;
         } else {
             OwnTracksLogDefault("[LocationManager] exit %{public}@", identifier);
             [self setKnownState:region inside:FALSE];
-            [self.delegate regionEvent:region enter:NO];
+            [self measureRegionEvent:region enter:NO];
         }
+    }
+}
+
+// mod17: iOSの出入りの知らせ。追いかけの円はすぐ渡す。場所の円は、出ならmodeを先に変え、
+// 1点測って（時間切れなら手元の最良の点で）送る。状態は知らせの時点で変えてあるので、自分の判定と二重にならない
+- (void)measureRegionEvent:(OTRegion *)region enter:(BOOL)enter {
+    if (region.isFollow) {
+        [self.delegate regionEvent:region enter:enter];
+        return;
+    }
+    if (!enter) {
+        [self.delegate regionMode:region enter:NO];
+    }
+    [self.measureEvents addObject:@[region, @(enter)]];
+    OwnTracksLogDefault("[LocationManager] measure %{public}@ %{public}@", enter ? @"enter" : @"exit", region.identifier);
+    if (self.measureTask == UIBackgroundTaskInvalid) {
+        __weak LocationManager *weakSelf = self;
+        self.measureTask = [[UIApplication sharedApplication] beginBackgroundTaskWithName:@"measure" expirationHandler:^{
+            OwnTracksLogDefault("[LocationManager] measure expired");
+            [weakSelf flushRegionEvents:weakSelf.boostBest ? weakSelf.boostBest : weakSelf.manager.location];
+        }];
+    }
+    [self.manager startUpdatingLocation];
+    if (!self.boostStart) {
+        [self startBoost];
+    }
+}
+
+// 測った点（無ければ手元の最良の点）で、待っていた出入りを送る。送る前に状態が変わっていないか確かめ直す
+- (void)flushRegionEvents:(CLLocation *)location {
+    NSArray<NSArray *> *events = [self.measureEvents copy];
+    [self.measureEvents removeAllObjects];
+    CLLocation *at = location ? location : self.manager.location;
+    for (NSArray *e in events) {
+        OTRegion *region = e[0];
+        BOOL enter = [e[1] boolValue];
+        if (self.knownStates[region.identifier].boolValue != enter) {
+            OwnTracksLogDefault("[LocationManager] measure skip %{public}@ (state changed)", region.identifier);
+            continue;
+        }
+        OwnTracksLogDefault("[LocationManager] measured %{public}@ %{public}@ acc=%.0f", enter ? @"enter" : @"exit",
+                            region.identifier, at ? at.horizontalAccuracy : -1.0);
+        self.eventLocation = at;
+        [self.delegate regionEvent:region enter:enter];
+        self.eventLocation = nil;
+    }
+    if (self.monitoring != LocationMonitoringMove && !self.wakeChecking && !self.boostStart) {
+        [self.manager stopUpdatingLocation];
+    }
+    if (self.measureTask != UIBackgroundTaskInvalid) {
+        [[UIApplication sharedApplication] endBackgroundTask:self.measureTask];
+        self.measureTask = UIBackgroundTaskInvalid;
     }
 }
 
@@ -796,10 +734,8 @@ static LocationManager *theInstance = nil;
         }
     }
     if (monitoring == LocationMonitoringMove) {
-        [self saveStationaryCenter:nil]; // mod12: 動き出したら静止の円を消す
         [self.recentFixes removeAllObjects];
     }
-    [self liveApplyMode];
     self.manager.pausesLocationUpdatesAutomatically = NO;
     self.manager.allowsBackgroundLocationUpdates = TRUE;
     
@@ -901,9 +837,19 @@ static LocationManager *theInstance = nil;
         self.badFixStreak = 0;
     }
     self.boostRetried = FALSE;
-    BOOL wake = self.wakeChecking;
     [self endBoost];
+    if (self.measureEvents.count) {
+        [self flushRegionEvents:location];
+    }
+    BOOL wake = self.wakeChecking;
     if (wake) {
+        // mod17: 1点目が精度良く場所の円の外なら、続けてもう1点測る
+        if (!self.wakeFirst && [self goodFix:location] && ![self placeAt:location]) {
+            self.wakeFirst = location;
+            OwnTracksLogDefault("[LocationManager] wake check first outside acc=%.0f", location.horizontalAccuracy);
+            [self startBoost];
+            return;
+        }
         [self finishWakeCheck:location];
         return;
     }
@@ -974,14 +920,14 @@ static LocationManager *theInstance = nil;
             }
             [self.exitStreak removeObjectForKey:identifier];
             // mod13: 出の時刻・位置は、外に出た1点目にする
-            self.exitAtLocation = self.exitFirst[identifier] ? self.exitFirst[identifier] : location;
+            self.eventLocation = self.exitFirst[identifier] ? self.exitFirst[identifier] : location;
             [self.exitFirst removeObjectForKey:identifier];
             OwnTracksLogDefault("[LocationManager] own exit %{public}@ d=%.0f r=%.0f",
                                 identifier, d, region.radius);
             result = [NSString stringWithFormat:@"exit %@", identifier];
             [self setKnownState:region inside:FALSE];
             [self.delegate regionEvent:region enter:NO];
-            self.exitAtLocation = nil;
+            self.eventLocation = nil;
         } else if (!inside && d <= region.radius) {
             [self.exitStreak removeObjectForKey:identifier];
             [self.exitFirst removeObjectForKey:identifier];
@@ -1063,9 +1009,6 @@ static LocationManager *theInstance = nil;
     [self.recentFixes removeAllObjects];
     self.monitoring = newMonitoring;
     if (newMonitoring == LocationMonitoringSignificant) {
-        if (!place) {
-            [self saveStationaryCenter:center];
-        }
         [self armFollowAt:place ? location : center];
     }
     NSManagedObjectContext *moc = CoreData.sharedInstance.mainMOC;
@@ -1086,25 +1029,18 @@ static LocationManager *theInstance = nil;
     }
 }
 
-// 静止の円の中心（端末に保存し、終了されても残す）
-- (void)saveStationaryCenter:(CLLocation *)center {
-    NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
-    if (center) {
-        [d setDouble:center.coordinate.latitude forKey:@"stationaryLat"];
-        [d setDouble:center.coordinate.longitude forKey:@"stationaryLon"];
-        [d setBool:TRUE forKey:@"stationaryHas"];
-    } else {
-        [d setBool:FALSE forKey:@"stationaryHas"];
+// mod17: この点が入っている場所の円（+・-以外、知っている状態でなく距離で見る）。無ければnil
+- (OTRegion *)placeAt:(CLLocation *)location {
+    for (OTRegion *region in self.regions.allValues) {
+        if ([region.identifier hasPrefix:@"+"] || [region.identifier hasPrefix:@"-"] || region.radius <= 0) {
+            continue;
+        }
+        CLLocation *c = [[CLLocation alloc] initWithLatitude:region.center.latitude longitude:region.center.longitude];
+        if ([location distanceFromLocation:c] <= region.radius) {
+            return region;
+        }
     }
-}
-
-- (CLLocation *)stationaryCenter {
-    NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
-    if (![d boolForKey:@"stationaryHas"]) {
-        return nil;
-    }
-    return [[CLLocation alloc] initWithLatitude:[d doubleForKey:@"stationaryLat"]
-                                      longitude:[d doubleForKey:@"stationaryLon"]];
+    return nil;
 }
 
 // mod12: mode 1で起こされたら（追いかけの円の出・大きな移動・訪問）、すぐ精度の良い点を取って判定する
@@ -1113,8 +1049,7 @@ static LocationManager *theInstance = nil;
         return;
     }
     // mod13: 大きな移動の通知は、起こされた判定の直後（60秒以内）なら確かめ直さない（起動時の2回目を防ぐ）
-    // mod16: liveUpdatesの動き出しも同じ扱い
-    if (([reason isEqualToString:@"significant"] || [reason isEqualToString:@"live"]) && self.lastWakeCheckEnd &&
+    if ([reason isEqualToString:@"significant"] && self.lastWakeCheckEnd &&
         -[self.lastWakeCheckEnd timeIntervalSinceNow] < 60.0) {
         OwnTracksLogDefault("[LocationManager] wake check skip %{public}@ (recent)", reason);
         return;
@@ -1125,6 +1060,7 @@ static LocationManager *theInstance = nil;
     OwnTracksLogDefault("[LocationManager] wake check start %{public}@", reason);
     self.wakeChecking = TRUE;
     self.wakeReason = reason;
+    self.wakeFirst = nil;
     self.wakeTask = [[UIApplication sharedApplication] beginBackgroundTaskWithName:@"wakeCheck" expirationHandler:^{
         [[UIApplication sharedApplication] endBackgroundTask:self.wakeTask];
         self.wakeTask = UIBackgroundTaskInvalid;
@@ -1149,13 +1085,13 @@ static LocationManager *theInstance = nil;
         [self judgeRegions:location src:reason ? reason : @"wake"];
         if (self.monitoring == LocationMonitoringSignificant) {
             OTRegion *place = [self insidePlace];
-            CLLocation *center = [self stationaryCenter];
-            CLLocationDistance d = center ? [location distanceFromLocation:center] : -1;
+            // mod17: 1点目も場所の円の外だった（2点続けて外）ならMove。静止の円の距離は見ない
+            BOOL twoOutside = self.wakeFirst != nil;
             // mod13: 場所の円の外の点が1点だけ（出の確定待ち）なら、Moveにして次の点で確かめる
             BOOL exitPending = self.exitStreak.count > 0;
-            if (good && ((!place && center && d > STATIONARY_EXIT) || exitPending)) {
-                OwnTracksLogDefault("[LocationManager] wake check %{public}@ acc=%.0f d=%.0f pending=%d -> move",
-                                    reason, location.horizontalAccuracy, d, exitPending);
+            if (good && ((!place && twoOutside) || exitPending)) {
+                OwnTracksLogDefault("[LocationManager] wake check %{public}@ acc=%.0f two=%d pending=%d -> move",
+                                    reason, location.horizontalAccuracy, twoOutside, exitPending);
                 // mode 1のうちに送る（すぐ送られる）。その後でMoveへ
                 [self.delegate wakeLocation:location];
                 self.monitoring = LocationMonitoringMove;
@@ -1163,11 +1099,8 @@ static LocationManager *theInstance = nil;
                 [Settings setInt:(int)LocationMonitoringMove forKey:@"monitoring_preference" inMOC:moc];
                 [CoreData.sharedInstance sync:moc];
             } else {
-                if (good && !place && !center) {
-                    [self saveStationaryCenter:location];
-                }
-                OwnTracksLogDefault("[LocationManager] wake check acc=%.0f d=%.0f place=%{public}@ -> stay",
-                                    location.horizontalAccuracy, d, place ? place.identifier : @"-");
+                OwnTracksLogDefault("[LocationManager] wake check acc=%.0f two=%d place=%{public}@ -> stay",
+                                    location.horizontalAccuracy, twoOutside, place ? place.identifier : @"-");
                 [self armFollowAt:location];
                 if ([reason isEqualToString:@"follow"]) {
                     [self.delegate wakeLocation:location];
@@ -1327,10 +1260,8 @@ static LocationManager *theInstance = nil;
         self.lastUsedLocation = location;
         [self.delegate newLocation:location];
 
-        // mod12: mode 1で大きな移動の通知が来て、静止の円より遠ければ、精度の良い点で確かめる
-        CLLocation *center = [self stationaryCenter];
-        if (self.monitoring == LocationMonitoringSignificant &&
-            (!center || [location distanceFromLocation:center] > STATIONARY_EXIT)) {
+        // mod17: mode 1で大きな移動の通知が来たら、精度の良い点で確かめる（静止の円の距離は見ない）
+        if (self.monitoring == LocationMonitoringSignificant) {
             [self startWakeCheck:@"significant"];
         }
     }

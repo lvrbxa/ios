@@ -41,6 +41,7 @@
         withPOI:(nullable NSString *)poi
       withImage:(nullable NSData *)image
   withImageName:(nullable NSString *)imageName;
+- (void)leaveHome;
 - (void)dump;
 - (void)status;
 - (void)waypoints;

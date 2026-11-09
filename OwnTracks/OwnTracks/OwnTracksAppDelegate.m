@@ -806,9 +806,10 @@
             
             CLLocation *location = [LocationManager sharedInstance].location;
             // mod13: アプリが確定した「出」は、外に出た1点目の時刻・位置で送る
-            CLLocation *exitAt = enter ? nil : [LocationManager sharedInstance].exitAtLocation;
-            if (exitAt) {
-                location = exitAt;
+            // mod17: iOSの知らせの出入りは、知らせの後に測った点の時刻・位置で送る
+            CLLocation *eventAt = [LocationManager sharedInstance].eventLocation;
+            if (eventAt) {
+                location = eventAt;
             }
 
             NSMutableDictionary *json = [[NSMutableDictionary alloc] init];
@@ -818,8 +819,8 @@
             
             json[@"lon"] = [NSNumber doubleValueWithSixDecimals:location.coordinate.longitude];
             
-            // 改造B: 出入りの時刻は検知した時刻にする（位置は最後の点のまま）。mod13: アプリが確定した出は1点目の時刻
-            json[@"tst"] = [NSNumber doubleValueWithZeroDecimals:(exitAt ? exitAt.timestamp : [NSDate date]).timeIntervalSince1970];
+            // 改造B: 出入りの時刻は検知した時刻にする。mod13・mod17: 点を渡されたらその点の時刻
+            json[@"tst"] = [NSNumber doubleValueWithZeroDecimals:(eventAt ? eventAt.timestamp : [NSDate date]).timeIntervalSince1970];
             
             if (location.horizontalAccuracy >= 0.0) {
                 json[@"acc"] = [NSNumber doubleValueWithZeroDecimals:location.horizontalAccuracy];
@@ -846,22 +847,7 @@
                                           qos:[Settings theQosInMOC:moc]
                                        retain:NO];
                     
-                    NSArray <NSString *> *components = [region.identifier componentsSeparatedByString:@"|"];
-                    if (components.count == 3) {
-                        LocationMonitoring newMonitoring;
-                        if (enter) {
-                            newMonitoring = components[1].integerValue;
-                        } else {
-                            newMonitoring = components[2].integerValue;
-                        }
-                        LocationManager.sharedInstance.monitoring = newMonitoring;
-                        [[NSUserDefaults standardUserDefaults] setBool:FALSE forKey:@"downgraded"];
-                        [[NSUserDefaults standardUserDefaults] setBool:FALSE forKey:@"adapted"];
-                        [Settings setInt:(int)[LocationManager sharedInstance].monitoring
-                                  forKey:@"monitoring_preference" inMOC:moc];
-                        [CoreData.sharedInstance sync:moc];
-                        [self background];
-                    }
+                    [self regionMode:region enter:enter];
                 }
             }
             
@@ -876,6 +862,26 @@
             }
         }
     }
+}
+
+// 場所の名前（名前|入|出）のmodeへ切り替える。すでにそのmodeなら何もしない（mod17: 出はiOSの知らせの時点で先に呼ぶ）
+- (void)regionMode:(OTRegion *)region enter:(BOOL)enter {
+    NSArray <NSString *> *components = [region.identifier componentsSeparatedByString:@"|"];
+    if (components.count != 3) {
+        return;
+    }
+    LocationMonitoring newMonitoring = enter ? components[1].integerValue : components[2].integerValue;
+    if (newMonitoring == LocationManager.sharedInstance.monitoring) {
+        return;
+    }
+    NSManagedObjectContext *moc = CoreData.sharedInstance.mainMOC;
+    LocationManager.sharedInstance.monitoring = newMonitoring;
+    [[NSUserDefaults standardUserDefaults] setBool:FALSE forKey:@"downgraded"];
+    [[NSUserDefaults standardUserDefaults] setBool:FALSE forKey:@"adapted"];
+    [Settings setInt:(int)[LocationManager sharedInstance].monitoring
+              forKey:@"monitoring_preference" inMOC:moc];
+    [CoreData.sharedInstance sync:moc];
+    [self background];
 }
 
 - (void)regionState:(OTRegion *)region inside:(BOOL)inside {
@@ -1375,6 +1381,30 @@
 
 #pragma actions
 
+// mod17: ショートカットのLeave Home。最後の点の位置に今の時刻を付け、印hですぐ送ってからMoveにする
+- (void)leaveHome {
+    LocationManager *lm = [LocationManager sharedInstance];
+    OwnTracksLogDefault("[OwnTracksAppDelegate] leave home intent mode=%ld", (long)lm.monitoring);
+    CLLocation *last = lm.location;
+    if (CLLocationCoordinate2DIsValid(last.coordinate)) {
+        CLLocation *now = [[CLLocation alloc] initWithCoordinate:last.coordinate
+                                                        altitude:last.altitude
+                                              horizontalAccuracy:last.horizontalAccuracy
+                                                verticalAccuracy:last.verticalAccuracy
+                                                       timestamp:[NSDate date]];
+        [self publishLocation:now trigger:@"h" withPOI:nil withImage:nil withImageName:nil];
+    }
+    if (lm.monitoring != LocationMonitoringMove) {
+        OwnTracksLogDefault("[OwnTracksAppDelegate] leave home -> move");
+        NSManagedObjectContext *moc = CoreData.sharedInstance.mainMOC;
+        lm.monitoring = LocationMonitoringMove;
+        [[NSUserDefaults standardUserDefaults] setBool:FALSE forKey:@"downgraded"];
+        [[NSUserDefaults standardUserDefaults] setBool:FALSE forKey:@"adapted"];
+        [Settings setInt:(int)LocationMonitoringMove forKey:@"monitoring_preference" inMOC:moc];
+        [CoreData.sharedInstance sync:moc];
+    }
+}
+
 - (BOOL)sendNow:(CLLocation *)location
         withPOI:(NSString *)poi
       withImage:(nullable NSData *)image
@@ -1442,9 +1472,9 @@
         return FALSE;
     }
 
-    // mod13: 同じ点は1回だけ送る（出入り・mode変更のあとの重なりをなくす）。手動（u・p）は除く
+    // mod13: 同じ点は1回だけ送る（出入り・mode変更のあとの重なりをなくす）。手動（u・p）とLeave Home（h）は除く
     static NSDate *lastPublishedTimestamp = nil;
-    if (![trigger isEqualToString:@"u"] && ![trigger isEqualToString:@"p"] &&
+    if (![trigger isEqualToString:@"u"] && ![trigger isEqualToString:@"p"] && ![trigger isEqualToString:@"h"] &&
         lastPublishedTimestamp && [location.timestamp isEqualToDate:lastPublishedTimestamp]) {
         OwnTracksLogDefault("[OwnTracksAppDelegate] publish skip same point t=%{public}@", trigger ? trigger : @"-");
         return FALSE;
