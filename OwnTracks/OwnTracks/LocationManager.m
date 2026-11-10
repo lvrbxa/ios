@@ -38,6 +38,9 @@
 // mod13: 円の外の点が続いた数（2点で「出」）、最後に起こされた判定の終わり、精度の悪い取得が続いた数
 @property (strong, nonatomic) NSMutableDictionary<NSString *, NSNumber *> *exitStreak;
 @property (strong, nonatomic) NSMutableDictionary<NSString *, CLLocation *> *exitFirst;
+// mod18: 円の中の点が続いた数（2点で「入」）と1点目
+@property (strong, nonatomic) NSMutableDictionary<NSString *, NSNumber *> *enterStreak;
+@property (strong, nonatomic) NSMutableDictionary<NSString *, CLLocation *> *enterFirst;
 @property (strong, nonatomic) NSDate *lastWakeCheckEnd;
 @property (nonatomic) NSInteger badFixStreak;
 @property (nonatomic) BOOL boostRetried;
@@ -148,6 +151,8 @@ static LocationManager *theInstance = nil;
     self.recentFixes = [[NSMutableArray alloc] init];
     self.exitStreak = [[NSMutableDictionary alloc] init];
     self.exitFirst = [[NSMutableDictionary alloc] init];
+    self.enterStreak = [[NSMutableDictionary alloc] init];
+    self.enterFirst = [[NSMutableDictionary alloc] init];
     self.wakeTask = UIBackgroundTaskInvalid;
     self.measureTask = UIBackgroundTaskInvalid;
     self.measureEvents = [[NSMutableArray alloc] init];
@@ -471,6 +476,11 @@ static LocationManager *theInstance = nil;
 }
 
 - (void)setKnownState:(OTRegion *)region inside:(BOOL)inside {
+    // mod18: 状態が変わったら、その場所の判定待ちの印を消す（どの経路でも）
+    NSNumber *before = self.knownStates[region.identifier];
+    if (!before || before.boolValue != inside) {
+        [self clearStreaks:region.identifier];
+    }
     self.knownStates[region.identifier] = @(inside);
     if (inside) {
         self.insideCircularRegions[region.identifier] = [NSNumber numberWithBool:TRUE];
@@ -478,6 +488,13 @@ static LocationManager *theInstance = nil;
         [self.insideCircularRegions removeObjectForKey:region.identifier];
     }
     [self.delegate regionState:region inside:inside];
+}
+
+- (void)clearStreaks:(NSString *)identifier {
+    [self.exitStreak removeObjectForKey:identifier];
+    [self.exitFirst removeObjectForKey:identifier];
+    [self.enterStreak removeObjectForKey:identifier];
+    [self.enterFirst removeObjectForKey:identifier];
 }
 
 // 記録済みの最後の状態を読むだけ（出入りのイベントにはしない）
@@ -548,7 +565,10 @@ static LocationManager *theInstance = nil;
     if (inside) {
         if (![self removeHoldDown:region]) {
             OwnTracksLogDefault("[LocationManager] enter %{public}@", identifier);
-            [self setKnownState:region inside:TRUE];
+            // mod18: 場所の円は、測った点で決まったときに状態を変える（flushRegionEvents）
+            if (region.isFollow) {
+                [self setKnownState:region inside:TRUE];
+            }
             [self measureRegionEvent:region enter:YES];
         } else {
             self.knownStates[identifier] = @(TRUE);
@@ -560,14 +580,16 @@ static LocationManager *theInstance = nil;
             [self.pendingRegionEvents addObject:[PendingRegionEvent holdDown:region for:3.0 to:self]];
         } else {
             OwnTracksLogDefault("[LocationManager] exit %{public}@", identifier);
-            [self setKnownState:region inside:FALSE];
+            if (region.isFollow) {
+                [self setKnownState:region inside:FALSE];
+            }
             [self measureRegionEvent:region enter:NO];
         }
     }
 }
 
-// mod17: iOSの出入りの知らせ。追いかけの円はすぐ渡す。場所の円は、出ならmodeを先に変え、
-// 1点測って（時間切れなら手元の最良の点で）送る。状態は知らせの時点で変えてあるので、自分の判定と二重にならない
+// mod17: iOSの出入りの知らせ。追いかけの円はすぐ渡す。場所の円は、出ならmodeを先に変え、1点測る。
+// mod18: 送るかは測った点で決める（flushRegionEvents）。知らせは測る合図
 - (void)measureRegionEvent:(OTRegion *)region enter:(BOOL)enter {
     if (region.isFollow) {
         [self.delegate regionEvent:region enter:enter];
@@ -576,7 +598,7 @@ static LocationManager *theInstance = nil;
     if (!enter) {
         [self.delegate regionMode:region enter:NO];
     }
-    [self.measureEvents addObject:@[region, @(enter)]];
+    [self.measureEvents addObject:@[region, @(enter), [NSDate date]]];
     OwnTracksLogDefault("[LocationManager] measure %{public}@ %{public}@", enter ? @"enter" : @"exit", region.identifier);
     if (self.measureTask == UIBackgroundTaskInvalid) {
         __weak LocationManager *weakSelf = self;
@@ -591,7 +613,9 @@ static LocationManager *theInstance = nil;
     }
 }
 
-// 測った点（無ければ手元の最良の点）で、待っていた出入りを送る。送る前に状態が変わっていないか確かめ直す
+// mod18: 測った点（無ければ手元の最良の点）で判定する。知らせより後の精度20m以内の点が、入なら半径の中、
+// 出なら半径の外のときだけ送り、そこで状態を変える。それ以外は送らず状態もそのまま（後の点で自分の判定に任せる）。
+// 出で、精度の良い点が中だったら、先に変えたmodeをその場所の「入」のmodeへ戻す
 - (void)flushRegionEvents:(CLLocation *)location {
     NSArray<NSArray *> *events = [self.measureEvents copy];
     [self.measureEvents removeAllObjects];
@@ -599,12 +623,31 @@ static LocationManager *theInstance = nil;
     for (NSArray *e in events) {
         OTRegion *region = e[0];
         BOOL enter = [e[1] boolValue];
-        if (self.knownStates[region.identifier].boolValue != enter) {
-            OwnTracksLogDefault("[LocationManager] measure skip %{public}@ (state changed)", region.identifier);
+        NSDate *notified = e[2];
+        NSString *identifier = region.identifier;
+        if (self.knownStates[identifier] && self.knownStates[identifier].boolValue == enter) {
+            OwnTracksLogDefault("[LocationManager] measure skip %{public}@ (already)", identifier);
             continue;
         }
-        OwnTracksLogDefault("[LocationManager] measured %{public}@ %{public}@ acc=%.0f", enter ? @"enter" : @"exit",
-                            region.identifier, at ? at.horizontalAccuracy : -1.0);
+        BOOL fresh = at && [at.timestamp timeIntervalSinceDate:notified] >= 0;
+        BOOL good = fresh && [self goodFix:at];
+        CLLocationDistance d = -1;
+        if (at) {
+            CLLocation *center = [[CLLocation alloc] initWithLatitude:region.center.latitude
+                                                            longitude:region.center.longitude];
+            d = [at distanceFromLocation:center];
+        }
+        BOOL match = good && (enter ? d <= region.radius : d > region.radius);
+        OwnTracksLogDefault("[LocationManager] measured %{public}@ %{public}@ acc=%.0f fresh=%d d=%.0f r=%.0f -> %{public}@",
+                            enter ? @"enter" : @"exit", identifier, at ? at.horizontalAccuracy : -1.0,
+                            fresh, d, region.radius, match ? @"send" : @"skip");
+        if (!match) {
+            if (!enter && good) {
+                [self.delegate regionMode:region enter:YES];
+            }
+            continue;
+        }
+        [self setKnownState:region inside:enter];
         self.eventLocation = at;
         [self.delegate regionEvent:region enter:enter];
         self.eventLocation = nil;
@@ -656,6 +699,7 @@ static LocationManager *theInstance = nil;
         [self removeHoldDown:region];
     }
     [self.regions removeObjectForKey:identifier];
+    [self clearStreaks:identifier];
     [self.knownStates removeObjectForKey:identifier];
     [self.initialPending removeObject:identifier];
     [self.insideCircularRegions removeObjectForKey:identifier];
@@ -929,16 +973,28 @@ static LocationManager *theInstance = nil;
             [self.delegate regionEvent:region enter:NO];
             self.eventLocation = nil;
         } else if (!inside && d <= region.radius) {
-            [self.exitStreak removeObjectForKey:identifier];
-            [self.exitFirst removeObjectForKey:identifier];
+            // mod18: 「入」も中の点が2点続いたら。時刻・位置は中に入った1点目
+            NSInteger n = self.enterStreak[identifier].integerValue + 1;
+            if (n < 2) {
+                self.enterStreak[identifier] = @(n);
+                self.enterFirst[identifier] = location;
+                result = [NSString stringWithFormat:@"enter pending %@", identifier];
+                continue;
+            }
+            CLLocation *first = self.enterFirst[identifier];
             OwnTracksLogDefault("[LocationManager] own enter %{public}@ d=%.0f r=%.0f",
                                 identifier, d, region.radius);
             result = [NSString stringWithFormat:@"enter %@", identifier];
             [self setKnownState:region inside:TRUE];
+            self.eventLocation = first ? first : location;
             [self.delegate regionEvent:region enter:YES];
+            self.eventLocation = nil;
         } else if (inside) {
             [self.exitStreak removeObjectForKey:identifier];
             [self.exitFirst removeObjectForKey:identifier];
+        } else {
+            [self.enterStreak removeObjectForKey:identifier];
+            [self.enterFirst removeObjectForKey:identifier];
         }
     }
     OwnTracksLogDefault("[LocationManager] judge src=%{public}@ acc=%.0f mode=%ld->%ld near=%{public}@ d=%.0f r=%.0f -> %{public}@",
