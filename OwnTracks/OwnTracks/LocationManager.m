@@ -349,10 +349,7 @@ static LocationManager *theInstance = nil;
         [[NSRunLoop currentRunLoop] addTimer:self.activityTimer
                                      forMode:NSRunLoopCommonModes];
     }
-    [self refreshRegionStates];
-    if (self.monitoring == LocationMonitoringSignificant) {
-        [self.manager requestLocation];
-    }
+    // mod19: 開いたときにiOSの状態を写さない（アプリの判定を上書きするため）。位置もすぐには取らない
     [self startBackgroundTimer];
 }
 
@@ -1032,6 +1029,10 @@ static LocationManager *theInstance = nil;
         return [now timeIntervalSinceDate:p.timestamp] <= STATIONARY_SECONDS;
     }];
     [self.recentFixes filterUsingPredicate:recent];
+    // mod19: 出入りの判定待ち（2点目待ち）がある間は静止にしない
+    if (self.enterStreak.count || self.exitStreak.count) {
+        return;
+    }
     if (self.recentFixes.count < STATIONARY_MIN_POINTS) {
         return;
     }
@@ -1083,6 +1084,19 @@ static LocationManager *theInstance = nil;
             [self startRegion:r];
         }
     }
+}
+
+// mod19: この点が追いかけの円（+で始まる範囲）の中か
+- (BOOL)insideFollowCircle:(CLLocation *)location {
+    for (OTRegion *region in self.regions.allValues) {
+        if (region.isFollow && region.radius > 0) {
+            CLLocation *c = [[CLLocation alloc] initWithLatitude:region.center.latitude longitude:region.center.longitude];
+            if ([location distanceFromLocation:c] <= region.radius) {
+                return TRUE;
+            }
+        }
+    }
+    return FALSE;
 }
 
 // mod17: この点が入っている場所の円（+・-以外、知っている状態でなく距離で見る）。無ければnil
@@ -1310,6 +1324,12 @@ static LocationManager *theInstance = nil;
         // 改造mod10: 範囲の監視の準備前は送らない（inregionsが空の点でWorkerが外出と誤判定するため）
         if (!self.monitor) {
             OwnTracksLogDefault("[LocationManager] location held (monitor not ready)");
+            continue;
+        }
+
+        // mod19: mode 1で届いた位置が追いかけの円の中なら、動いていないので無視する（送らず測り直さない）
+        if (self.monitoring == LocationMonitoringSignificant && [self insideFollowCircle:location]) {
+            OwnTracksLogDefault("[LocationManager] significant ignored (inside follow)");
             continue;
         }
 
